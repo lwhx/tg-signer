@@ -235,3 +235,14 @@ def test_pydantic_normalized_defaults_still_editable():
     advanced = copy.deepcopy(rule)
     advanced["filters"]["chat_id"] = "@other_source"
     assert not editable_rule(advanced)
+
+
+def test_telegram_saved_messages_destination():
+    assert chat_ids_from_text("me", allow_me=True) == ["me"]
+    assert chat_ids_from_text("SELF", allow_me=True) == ["me"]
+    with pytest.raises(ValueError):
+        chat_ids_from_text("me")
+    rule = sample_rule(
+        targets=[{"chat_id": "me", "mode": "copy", "dedup": "message"}]
+    )
+    assert rule["handlers"][0]["params"]["targets"][0]["chat_id"] == "me"
