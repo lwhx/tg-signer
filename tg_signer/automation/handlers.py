@@ -15,6 +15,7 @@ from tg_signer.config import HttpCallback, UDPForward
 from tg_signer.core import UserMonitor
 from tg_signer.notification.server_chan import sc_send
 
+from .dispatch_ledger import DispatchLedger
 from .models import AutomationContext, Event
 
 # 统一 handler 返回值语义：
@@ -579,10 +580,38 @@ async def random_pick(
     return "continue"
 
 
+async def dispatch_link_to_bot(event: Event, ctx: AutomationContext, params: Dict[str, Any]) -> HandlerResult:
+    """Deliver an extracted link to an existing bot with persistent deduplication."""
+    target = params.get("bot_chat_id")
+    pattern = params.get("pattern")
+    if not target or not pattern or not event.message:
+        return "stop"
+    text = message_text(event.message)
+    match = re.search(pattern, text, flags=re.IGNORECASE)
+    if match is None:
+        return "stop"
+    link = match.group(1) if match.lastindex else match.group(0)
+    ledger = DispatchLedger(ctx.workdir)
+    dest = str(target).strip().lower()
+    digest = ledger.reserve(dest, link)
+    if digest is None:
+        ctx.log("链接已投递或正在发送，跳过重复消息", level="INFO")
+        return "continue"
+    try:
+        await ctx.worker.send_message(target, link)
+    except Exception:
+        ledger.finish(dest, digest, False)
+        ctx.log("向现有Bot发送链接失败", level="ERROR")
+        return "stop"
+    ledger.finish(dest, digest, True)
+    ctx.log("链接已发送至Bot，不代表转存完成", level="INFO")
+    return "continue"
+
 def register_builtin_handlers() -> None:
     register("send_text", send_text)
     register("reply_text", reply_text)
     register("extract_regex", extract_regex)
+    register("dispatch_link_to_bot", dispatch_link_to_bot)
     register("ai_reply", ai_reply)
     register("blacklist_filter", blacklist_filter)
     register("delay", delay)
