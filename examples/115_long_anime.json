@@ -21,10 +21,19 @@
       },
       "handlers": [
         {
-          "handler": "dispatch_link_to_bot",
+          "handler": "relay_message",
           "params": {
-            "bot_chat_id": "@YOUR_115_BOT",
-            "pattern": "(https?://115cdn\\.com/s/[^\\s]+)"
+            "ignore_self": true,
+            "targets": [
+              {
+                "chat_id": "@YOUR_115_BOT",
+                "mode": "extract",
+                "pattern": "(https?://115cdn\\.com/s/[^\\s]+)",
+                "group": 1,
+                "dedup": "content",
+                "retry_after_seconds": 600
+              }
+            ]
           }
         }
       ]
