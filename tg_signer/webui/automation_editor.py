@@ -46,7 +46,9 @@ DEDUP_LABELS = {
 
 
 class RelayTargetCard:
-    def __init__(self, position: int, initial: dict[str, Any], on_remove) -> None:
+    def __init__(
+        self, position: int, initial: dict[str, Any], on_remove, on_mode_change
+    ) -> None:
         with ui.card().classes("w-full border rounded-lg p-3") as self.container:
             with ui.row().classes("w-full items-center justify-between"):
                 ui.label(f"目标 {position + 1}").classes("font-semibold")
@@ -87,7 +89,9 @@ class RelayTargetCard:
                 value=initial.get("template", ""),
                 placeholder="例如：来源 {chat_id}，正文：{text}",
             ).classes("w-full")
-            self.mode.on_value_change(lambda _: self.refresh_visibility())
+            self.mode.on_value_change(
+                lambda _: (self.refresh_visibility(), on_mode_change())
+            )
             self.refresh_visibility()
 
     def refresh_visibility(self) -> None:
@@ -269,7 +273,7 @@ class RelayRuleDialog:
         with self.target_container:
             for item in targets:
                 card = RelayTargetCard(
-                    len(self.targets), item, self.remove_target
+                    len(self.targets), item, self.remove_target, self.refresh_test_options
                 )
                 self.targets.append(card)
         self.refresh_test_options()
@@ -280,7 +284,10 @@ class RelayRuleDialog:
             return
         with self.target_container:
             self.targets.append(
-                RelayTargetCard(len(self.targets), {}, self.remove_target)
+                RelayTargetCard(
+                    len(self.targets), {}, self.remove_target,
+                    self.refresh_test_options,
+                )
             )
         self.refresh_test_options()
 
