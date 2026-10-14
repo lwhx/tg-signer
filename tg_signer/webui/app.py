@@ -693,7 +693,7 @@ def _auth_gate(container, auth_code: str, on_success: Callable[[], None]) -> Non
                     if not code:
                         ui.notify("请输入授权码", type="warning")
                         return
-                    if not compare_digest(code, auth_code):
+                    if not compare_digest(code.encode("utf-8"), auth_code.encode("utf-8")):
                         AUTH_ATTEMPTS.append(now)
                         status.text = "授权码错误，请重试"
                         status.update()
