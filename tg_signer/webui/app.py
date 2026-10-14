@@ -22,6 +22,7 @@ from tg_signer.webui.data import (
     load_user_infos,
     save_config,
 )
+from tg_signer.webui.automation_editor import RelayRuleDialog
 from tg_signer.webui.interactive import InteractiveSignerConfig
 from tg_signer.webui.schema_utils import clean_schema
 
@@ -102,7 +103,11 @@ class BaseConfigBlock:
     ):
         self.kind = kind
         self.template = template
-        self.title = "签到配置 (signer)" if kind == "signer" else "监控配置 (monitor)"
+        self.title = {
+            "signer": "签到配置 (Signer)",
+            "monitor": "监控配置 (Monitor)",
+            "automation": "自动化配置 (Automation)",
+        }[kind]
         self.root_dir, self.cfg_cls = CONFIG_META[kind]
         with ui.card().classes("w-full shadow-md"):
             ui.label(self.title).classes("text-lg font-semibold")
@@ -127,7 +132,7 @@ class BaseConfigBlock:
             # MonitorConfig schema causes json_editor to fail rendering due to "format": "uri" etc.
             # We need to clean the schema before passing it to the editor.
             schema = TypeAdapter(self.cfg_cls | None).json_schema()
-            if self.kind == "monitor":
+            if self.kind in {"monitor", "automation"}:
                 schema = clean_schema(schema)
 
             def on_change(e):
@@ -291,6 +296,43 @@ class SignerBlock(BaseConfigBlock):
 class MonitorBlock(BaseConfigBlock):
     def __init__(self, template: Dict[str, object]):
         super().__init__("monitor", template)
+
+
+class AutomationBlock(BaseConfigBlock):
+    """Automation JSON editor with an opt-in visual editor for relay rules."""
+
+    def __init__(self):
+        self.active_dialog: RelayRuleDialog | None = None
+        super().__init__("automation", {"rules": []})
+
+    def setup_toolbar(self) -> None:
+        ui.button(
+            "可视化消息转发",
+            icon="tune",
+            on_click=self.open_visual_editor,
+        ).props("outline")
+
+    def open_visual_editor(self) -> None:
+        try:
+            current = self.editor.properties["content"].get("json")
+            if isinstance(current, str):
+                payload = json.loads(current) if current.strip() else {"rules": []}
+            else:
+                payload = current or {"rules": []}
+            if not isinstance(payload, dict):
+                raise ValueError("Automation 配置必须是 JSON 对象")
+            self.active_dialog = RelayRuleDialog(
+                payload, on_apply=self.update_visual_json
+            )
+            self.active_dialog.open()
+        except (ValueError, TypeError, json.JSONDecodeError) as exc:
+            notify_error(exc)
+
+    def update_visual_json(self, payload: Dict[str, object]) -> None:
+        self.editor.properties["content"]["json"] = payload
+        self.editor.update()
+
+
 
 
 def user_info_block() -> Callable[[], None]:
@@ -577,11 +619,12 @@ def _build_dashboard(container) -> None:
         with ui.tab_panels(tabs, value=tab_configs).classes("w-full"):
             with ui.tab_panel(tab_configs):
                 ui.label(
-                    "管理 signer 和 monitor 的配置文件，支持查看、编辑和删除。"
+                    "管理 Signer、Monitor 和 Automation 配置；消息转发支持可视化规则编辑。"
                 ).classes("text-gray-600")
                 with ui.tabs().classes("mt-2") as sub_tabs:
                     tab_signer = ui.tab("Signer")
                     tab_monitor = ui.tab("Monitor")
+                    tab_automation = ui.tab("Automation · 转发规则")
                 with ui.tab_panels(sub_tabs, value=tab_signer).classes("w-full"):
                     with ui.tab_panel(tab_signer):
                         refreshers.append(
@@ -589,6 +632,8 @@ def _build_dashboard(container) -> None:
                         )
                     with ui.tab_panel(tab_monitor):
                         refreshers.append(MonitorBlock(MONITOR_TEMPLATE))
+                    with ui.tab_panel(tab_automation):
+                        refreshers.append(AutomationBlock())
 
             with ui.tab_panel(tab_users):
                 ui.label("查看当前已登录账户信息 (users/*/me.json)。").classes(
