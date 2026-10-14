@@ -17,14 +17,18 @@ DEDUP_MODES = ("message", "content", "off")
 MATCH_TYPES = ("all", "contains", "exact", "regex")
 
 
-def chat_ids_from_text(value: str, *, required: bool = True) -> list[int | str]:
+def chat_ids_from_text(
+    value: str, *, required: bool = True, allow_me: bool = False
+) -> list[int | str]:
     """Parse comma/newline separated Telegram Chat IDs or @usernames."""
     result: list[int | str] = []
     for item in re.split(r"[,，\n\r]+", value or ""):
         item = item.strip()
         if not item:
             continue
-        if item.startswith("@"):
+        if allow_me and item.lower() in {"me", "self"}:
+            parsed: int | str = "me"
+        elif item.startswith("@"):
             if not re.fullmatch(r"@[a-zA-Z0-9_]{1,64}", item):
                 raise ValueError(f"无效的用户名: {item}")
             parsed: int | str = item
@@ -82,7 +86,7 @@ def build_relay_rule(
         raise ValueError("至少添加 1 个目标，最多 25 个")
     clean_targets: list[dict[str, Any]] = []
     for index, target in enumerate(targets, 1):
-        ids = chat_ids_from_text(str(target.get("chat_id") or ""))
+        ids = chat_ids_from_text(str(target.get("chat_id") or ""), allow_me=True)
         if len(ids) != 1:
             raise ValueError(f"第 {index} 个目标只能填写一个 Chat ID")
         chat_id = ids[0]
