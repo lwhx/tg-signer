@@ -1,0 +1,33 @@
+{
+  "rules": [
+    {
+      "id": "long_anime_115",
+      "enabled": true,
+      "triggers": [
+        {
+          "type": "message",
+          "params": {
+            "chat_ids": [
+              "@SOURCE_CHANNEL_1",
+              "@SOURCE_CHANNEL_2"
+            ]
+          }
+        }
+      ],
+      "filters": {
+        "text_rule": "regex",
+        "text_value": "\\A20\\d{2}｜长时｜连载｜国漫｜[^\\r\\n]+(?:\\r?\\n[ \\t]*)+https?://115cdn\\.com/s/[^\\s\\r\\n]+[ \\t]*(?:\\r?\\n[ \\t]*)*\\Z",
+        "ignore_case": true
+      },
+      "handlers": [
+        {
+          "handler": "dispatch_link_to_bot",
+          "params": {
+            "bot_chat_id": "@YOUR_115_BOT",
+            "pattern": "(https?://115cdn\\.com/s/[^\\s]+)"
+          }
+        }
+      ]
+    }
+  ]
+}
