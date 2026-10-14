@@ -159,8 +159,15 @@ def editable_rule(rule: dict[str, Any]) -> bool:
         and isinstance(triggers[0], dict)
         and set(triggers[0]) <= {"type", "params"}
         and triggers[0].get("type") == "message"
+        and isinstance(triggers[0].get("params", {}), dict)
         and set(triggers[0].get("params", {}))
-        <= {"chat_id", "chat_ids", "from_user_ids"}
+        <= {
+            "chat_id", "chat_ids", "from_user_ids",
+            "reply_to_me", "reply_to_message_id", "ignore_case"
+        }
+        and not triggers[0].get("params", {}).get("reply_to_me", False)
+        and triggers[0].get("params", {}).get("reply_to_message_id") is None
+        and triggers[0].get("params", {}).get("ignore_case", True) is True
         and len(handlers) == 1
         and isinstance(handlers[0], dict)
         and set(handlers[0]) <= {"handler", "params"}
@@ -168,7 +175,13 @@ def editable_rule(rule: dict[str, Any]) -> bool:
         and isinstance(handlers[0].get("params", {}), dict)
         and not rule.get("vars")
         and set((rule.get("filters") or {}))
-        <= {"text_rule", "text_value", "ignore_case"}
+        <= {
+            "chat_id", "chat_ids", "from_user_ids",
+            "text_rule", "text_value", "ignore_case"
+        }
+        and not (rule.get("filters") or {}).get("chat_id")
+        and not (rule.get("filters") or {}).get("chat_ids")
+        and not (rule.get("filters") or {}).get("from_user_ids")
         and set(handlers[0].get("params", {})) <= {"ignore_self", "targets"}
         and isinstance(handlers[0].get("params", {}).get("targets", []), list)
         and all(
