@@ -1,5 +1,8 @@
 import json
 import os
+import time
+from collections import deque
+from hmac import compare_digest
 from pathlib import Path
 from typing import Callable, Dict
 
@@ -22,6 +25,7 @@ from tg_signer.webui.data import (
     load_user_infos,
     save_config,
 )
+from tg_signer.webui.automation_editor import RelayRuleDialog
 from tg_signer.webui.interactive import InteractiveSignerConfig
 from tg_signer.webui.schema_utils import clean_schema
 
@@ -67,6 +71,7 @@ MONITOR_TEMPLATE: Dict[str, object] = {
 
 AUTH_CODE_ENV = "TG_SIGNER_GUI_AUTHCODE"
 AUTH_STORAGE_KEY = "tg_signer_gui_auth_code"
+AUTH_ATTEMPTS: deque[float] = deque(maxlen=100)
 
 
 class UIState:
@@ -102,7 +107,11 @@ class BaseConfigBlock:
     ):
         self.kind = kind
         self.template = template
-        self.title = "签到配置 (signer)" if kind == "signer" else "监控配置 (monitor)"
+        self.title = {
+            "signer": "签到配置 (Signer)",
+            "monitor": "监控配置 (Monitor)",
+            "automation": "自动化配置 (Automation)",
+        }[kind]
         self.root_dir, self.cfg_cls = CONFIG_META[kind]
         with ui.card().classes("w-full shadow-md"):
             ui.label(self.title).classes("text-lg font-semibold")
@@ -127,7 +136,7 @@ class BaseConfigBlock:
             # MonitorConfig schema causes json_editor to fail rendering due to "format": "uri" etc.
             # We need to clean the schema before passing it to the editor.
             schema = TypeAdapter(self.cfg_cls | None).json_schema()
-            if self.kind == "monitor":
+            if self.kind in {"monitor", "automation"}:
                 schema = clean_schema(schema)
 
             def on_change(e):
@@ -291,6 +300,43 @@ class SignerBlock(BaseConfigBlock):
 class MonitorBlock(BaseConfigBlock):
     def __init__(self, template: Dict[str, object]):
         super().__init__("monitor", template)
+
+
+class AutomationBlock(BaseConfigBlock):
+    """Automation JSON editor with an opt-in visual editor for relay rules."""
+
+    def __init__(self):
+        self.active_dialog: RelayRuleDialog | None = None
+        super().__init__("automation", {"rules": []})
+
+    def setup_toolbar(self) -> None:
+        ui.button(
+            "可视化消息转发",
+            icon="tune",
+            on_click=self.open_visual_editor,
+        ).props("outline")
+
+    def open_visual_editor(self) -> None:
+        try:
+            current = self.editor.properties["content"].get("json")
+            if isinstance(current, str):
+                payload = json.loads(current) if current.strip() else {"rules": []}
+            else:
+                payload = current or {"rules": []}
+            if not isinstance(payload, dict):
+                raise ValueError("Automation 配置必须是 JSON 对象")
+            self.active_dialog = RelayRuleDialog(
+                payload, on_apply=self.update_visual_json
+            )
+            self.active_dialog.open()
+        except (ValueError, TypeError, json.JSONDecodeError) as exc:
+            notify_error(exc)
+
+    def update_visual_json(self, payload: Dict[str, object]) -> None:
+        self.editor.properties["content"]["json"] = payload
+        self.editor.update()
+
+
 
 
 def user_info_block() -> Callable[[], None]:
@@ -577,11 +623,12 @@ def _build_dashboard(container) -> None:
         with ui.tab_panels(tabs, value=tab_configs).classes("w-full"):
             with ui.tab_panel(tab_configs):
                 ui.label(
-                    "管理 signer 和 monitor 的配置文件，支持查看、编辑和删除。"
+                    "管理 Signer、Monitor 和 Automation 配置；消息转发支持可视化规则编辑。"
                 ).classes("text-gray-600")
                 with ui.tabs().classes("mt-2") as sub_tabs:
                     tab_signer = ui.tab("Signer")
                     tab_monitor = ui.tab("Monitor")
+                    tab_automation = ui.tab("Automation · 转发规则")
                 with ui.tab_panels(sub_tabs, value=tab_signer).classes("w-full"):
                     with ui.tab_panel(tab_signer):
                         refreshers.append(
@@ -589,6 +636,8 @@ def _build_dashboard(container) -> None:
                         )
                     with ui.tab_panel(tab_monitor):
                         refreshers.append(MonitorBlock(MONITOR_TEMPLATE))
+                    with ui.tab_panel(tab_automation):
+                        refreshers.append(AutomationBlock())
 
             with ui.tab_panel(tab_users):
                 ui.label("查看当前已登录账户信息 (users/*/me.json)。").classes(
@@ -633,14 +682,19 @@ def _auth_gate(container, auth_code: str, on_success: Callable[[], None]) -> Non
                 status = ui.label("").classes("text-sm text-negative")
 
                 def verify() -> None:
-                    # TODO: Security improvements needed
-                    # 1. Add rate limiting (e.g. max 5 attempts per minute) to prevent brute-force attacks.
-                    # 2. Use secrets.compare_digest(code, auth_code) to prevent timing attacks.
+                    now = time.monotonic()
+                    while AUTH_ATTEMPTS and now - AUTH_ATTEMPTS[0] >= 60:
+                        AUTH_ATTEMPTS.popleft()
+                    if len(AUTH_ATTEMPTS) >= 5:
+                        status.text = "验证次数过多，请一分钟后重试"
+                        status.update()
+                        return
                     code = (code_input.value or "").strip()
                     if not code:
                         ui.notify("请输入授权码", type="warning")
                         return
-                    if code != auth_code:
+                    if not compare_digest(code.encode("utf-8"), auth_code.encode("utf-8")):
+                        AUTH_ATTEMPTS.append(now)
                         status.text = "授权码错误，请重试"
                         status.update()
                         code_input.set_value("")
@@ -678,6 +732,14 @@ def build_ui(auth_code: str = None) -> None:
 
 
 def main(host: str = None, port: int = None, storage_secret: str = None) -> None:
+    bind_host = host or "127.0.0.1"
+    if bind_host not in {"localhost", "127.0.0.1", "::1"} and not os.environ.get(
+        AUTH_CODE_ENV, ""
+    ).strip():
+        raise ValueError(
+            "公网/局域网监听 WebUI 时必须设置 TG_SIGNER_GUI_AUTHCODE；"
+            "建议配合反向代理和 HTTPS，或仅绑定 127.0.0.1"
+        )
     ui.run(
         build_ui,
         title="TG Signer WebUI",

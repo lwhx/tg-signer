@@ -2,7 +2,7 @@
 
 **Telegram 通用消息监控与转发平台**。基于 [amchii/tg-signer](https://github.com/amchii/tg-signer) 二次开发，保留原有签到、监控和自动化规则引擎，遵守 BSD-3-Clause 许可证。
 
-> [通用消息转发使用说明](docs/message-relay.md) | [通用示例配置](examples/message_relay_basic.json) | [115 Bot 场景示例](examples/115_long_anime.json) | [开发路线](docs/lwhx-development.md)
+> [通用消息转发使用说明](docs/message-relay.md) | [WebUI 可视化转发配置](docs/webui-relay.md) | [通用示例配置](examples/message_relay_basic.json) | [115 Bot 场景示例](examples/115_long_anime.json) | [开发路线](docs/lwhx-development.md)
 
 > 安装本仓库源码：`pip install "lwhx-tg-signer @ git+https://github.com/lwhx/tg-signer.git"`。原来的 `pip install tg-signer` 指向上游发布包。
 
@@ -17,6 +17,7 @@
 - 调用AI进行图片识别并点击键盘
 - 个人、群组、频道消息监控、转发与自动回复
 - 通用多目标转发：原生转发、复制、文本转发、正则提取、模板发送和 SQLite 去重（本仓库增强）
+- WebUI：可视化创建/修改/删除 Automation 转发规则、正则捕获测试（本仓库增强）
 - 根据配置执行动作流
 - 自动化规则引擎（message/timer/startup 触发 + handler 链）
 

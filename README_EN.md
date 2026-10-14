@@ -1,6 +1,6 @@
 # lwhx/tg-signer
 
-**General-purpose Telegram message monitoring and forwarding platform** built on [amchii/tg-signer](https://github.com/amchii/tg-signer), preserving upstream check-ins and automation features under BSD-3-Clause. See [Message Relay](docs/message-relay.md), [generic examples](examples/message_relay_basic.json) and [115 bot example](examples/115_long_anime.json).
+**General-purpose Telegram message monitoring and forwarding platform** built on [amchii/tg-signer](https://github.com/amchii/tg-signer), preserving upstream check-ins and automation features under BSD-3-Clause. See [Message Relay](docs/message-relay.md), [WebUI relay rule editor](docs/webui-relay.md), [generic examples](examples/message_relay_basic.json) and [115 bot example](examples/115_long_anime.json).
 
 ## Telegram Daily Auto Check-in / Personal, Group, and Channel Message Monitoring with Auto Reply
 

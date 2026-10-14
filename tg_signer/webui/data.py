@@ -5,14 +5,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Literal, Optional, Tuple
 
-from tg_signer.config import BaseJSONConfig, MonitorConfig, SignConfigV3
+from tg_signer.config import AutomationConfig, BaseJSONConfig, MonitorConfig, SignConfigV3
 from tg_signer.sign_record_store import SignRecordStore
 
-ConfigKind = Literal["signer", "monitor"]
+ConfigKind = Literal["signer", "monitor", "automation"]
 
 CONFIG_META: dict[ConfigKind, Tuple[str, type[BaseJSONConfig]]] = {
     "signer": ("signs", SignConfigV3),
     "monitor": ("monitors", MonitorConfig),
+    "automation": ("automations", AutomationConfig),
 }
 
 DEFAULT_WORKDIR = Path(os.environ.get("TG_SIGNER_WORKDIR", ".signer"))
@@ -58,6 +59,17 @@ def _config_root(kind: ConfigKind, workdir: Optional[Path | str]) -> Path:
 
 
 def _config_path(kind: ConfigKind, name: str, workdir: Optional[Path | str]) -> Path:
+    # Task names are folder components, never a user-supplied relative path.
+    if (
+        not isinstance(name, str)
+        or not name
+        or len(name) > 128
+        or name in {".", ".."}
+        or "/" in name
+        or "\\" in name
+        or any(ord(char) < 32 for char in name)
+    ):
+        raise ValueError("配置名称只能是单个文件夹名，不能包含路径或控制字符")
     return _config_root(kind, workdir) / name / "config.json"
 
 
