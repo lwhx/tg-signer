@@ -16,16 +16,16 @@ from tg_signer.webui.regex_preview import preview_text_match
 
 
 def sample_rule(**overrides):
-    args = dict(
-        rule_id="relay_2026_news",
-        enabled=True,
-        sources="@source_one\n-100123456",
-        senders="",
-        text_rule="regex",
-        text_value=r"20\d{2}.*新闻",
-        ignore_case=True,
-        ignore_self=True,
-        targets=[
+    args = {
+        "rule_id": "relay_2026_news",
+        "enabled": True,
+        "sources": "@source_one\n-100123456",
+        "senders": "",
+        "text_rule": "regex",
+        "text_value": r"20\d{2}.*新闻",
+        "ignore_case": True,
+        "ignore_self": True,
+        "targets": [
             {"chat_id": "@archive", "mode": "forward", "dedup": "message"},
             {
                 "chat_id": "-100991",
@@ -36,7 +36,7 @@ def sample_rule(**overrides):
                 "dedup": "content",
             },
         ],
-    )
+    }
     args.update(overrides)
     return build_relay_rule(**args)
 
