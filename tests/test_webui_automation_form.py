@@ -42,8 +42,8 @@ def sample_rule(**overrides):
 
 
 def test_chat_ids_parse_multiline_and_dedup():
-    assert chat_ids_from_text("@A, @A\n-100123\n-100123") == [
-        "@A",
+    assert chat_ids_from_text("@A, @a\n-100123\n-100123") == [
+        "@a",
         -100123,
     ]
 
