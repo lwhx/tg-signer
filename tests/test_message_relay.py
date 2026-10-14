@@ -240,3 +240,15 @@ async def test_content_dedup_does_not_drop_media_without_caption(tmp_path):
         event(text=None, message_id=2), ctx, params
     ) == "continue"
     assert len(ctx.client.forwarded) == 2
+
+
+@pytest.mark.asyncio
+async def test_message_dedup_is_independent_between_rules(tmp_path):
+    ctx = Context(tmp_path)
+    params = {"targets": [{"chat_id": "@bot", "mode": "text"}]}
+    first = event()
+    second = event()
+    second.rule_id = "separate_rule"
+    assert await relay_message(first, ctx, params) == "continue"
+    assert await relay_message(second, ctx, params) == "continue"
+    assert len(ctx.worker.sent) == 2
