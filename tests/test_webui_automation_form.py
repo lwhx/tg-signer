@@ -180,3 +180,37 @@ def test_bad_regex_and_preview_input_limits():
         preview_text_match("regex", "a", "x" * 8001)
     with pytest.raises(ValueError):
         preview_text_match("regex", "x" * 2049, "ok")
+
+
+def test_extract_rejects_nonexistent_capture_groups():
+    with pytest.raises(ValueError, match="捕获组"):
+        sample_rule(
+            targets=[
+                {
+                    "chat_id": "@dest",
+                    "mode": "extract",
+                    "pattern": r"(hello)",
+                    "group": 2,
+                }
+            ]
+        )
+    with pytest.raises(ValueError, match="命名捕获组"):
+        sample_rule(
+            targets=[
+                {
+                    "chat_id": "@dest",
+                    "mode": "extract",
+                    "pattern": r"(hello)",
+                    "group": "missing",
+                }
+            ]
+        )
+
+
+def test_advanced_rule_custom_fields_are_preserved():
+    custom = sample_rule()
+    custom["description"] = "Do not drop this custom field"
+    assert not editable_rule(custom)
+    existing = {"rules": [custom]}
+    newer = replace_rule(existing, sample_rule(rule_id="other_rule"))
+    assert newer["rules"][0] == custom
