@@ -99,10 +99,10 @@ jobs:
             docker compose --env-file .env.example logs --tail=120 dashboard
             exit 1
           fi
-          test -f data/dashboard.sqlite3
-          test -f data/encryption.key
-          test -f data/jwt.key
-          test -f data/initial-password.txt
+          # The entrypoint chowns /data to UID 10001 and sets mode 0700.
+          # Host runner UID cannot traverse that folder; verify inside container.
+          docker compose --env-file .env.example exec -T dashboard python -c \
+            "from pathlib import Path; root=Path('/data'); required=['dashboard.sqlite3','encryption.key','jwt.key','initial-password.txt']; assert all((root/name).is_file() for name in required), required"
           docker compose --env-file .env.example ps
       - name: Tear down test deployment
         if: always()
