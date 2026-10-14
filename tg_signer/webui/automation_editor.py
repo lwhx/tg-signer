@@ -15,7 +15,6 @@ from nicegui import ui
 from tg_signer.config import AutomationConfig
 from tg_signer.webui.automation_form import (
     DEDUP_MODES,
-    MATCH_TYPES,
     MODES,
     build_relay_rule,
     delete_rule,
