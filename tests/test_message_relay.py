@@ -223,3 +223,20 @@ def test_concurrent_reservation(tmp_path):
     assert second.reserve("@bot", digest, "text", "-100", 10) == (
         "duplicate", None
     )
+
+
+@pytest.mark.asyncio
+async def test_content_dedup_does_not_drop_media_without_caption(tmp_path):
+    ctx = Context(tmp_path)
+    params = {
+        "targets": [
+            {"chat_id": "@archive", "mode": "forward", "dedup": "content"}
+        ]
+    }
+    assert await relay_message(
+        event(text=None, message_id=1), ctx, params
+    ) == "continue"
+    assert await relay_message(
+        event(text=None, message_id=2), ctx, params
+    ) == "continue"
+    assert len(ctx.client.forwarded) == 2
