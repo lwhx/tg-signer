@@ -1,3 +1,5 @@
+# Legacy CLI Compose example. Requires a local start.sh and should not be used
+# for the new WebUI image. Prefer ../docker-compose.yml at repository root.
 networks:
   tg_host:
     external: false
