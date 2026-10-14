@@ -1,0 +1,57 @@
+tg-signer Dashboard 安装说明
+====================================
+
+镜像 ghcr.io/dongbo501/tg-signer:latest 适用于 Linux x86_64 / amd64。
+镜像不包含账号、任务、Telegram Session、数据库或任何密钥。
+
+1. 准备 Docker
+--------------
+Ubuntu / Debian 未安装 Docker 时，以 root 执行：
+
+  apt-get update
+  apt-get install -y curl ca-certificates
+  curl -fsSL https://get.docker.com -o /tmp/install-docker.sh
+  sh /tmp/install-docker.sh
+  systemctl enable --now docker
+
+2. 下载 Compose 并启动
+-----------------------
+
+  mkdir -p /opt/tg-signer
+  cd /opt/tg-signer
+  curl -fsSLO https://raw.githubusercontent.com/dongbo501/TG-SIGNER/main/docker-compose.yml
+  docker compose pull
+  docker compose up -d --wait
+
+启动后只运行单个 dashboard 容器；data 目录会自动创建并修正属主，无需手动 chown。
+默认只绑定 127.0.0.1:8999。首次密码写入 data/initial-password.txt；登录后请立即修改。
+通过 SSH 隧道访问：
+
+  ssh -L 8999:127.0.0.1:8999 root@服务器地址
+
+3. 修改安装参数
+----------------
+
+编辑 docker-compose.yml 中的 TZ、COOKIE_SECURE、ADMIN_PASSWORD 和端口映射，然后执行：
+
+  docker compose up -d --wait
+
+ADMIN_PASSWORD 只在首次初始化时生效，至少需要 12 个字符。公网 HTTPS 反向代理应设置
+COOKIE_SECURE=true，并保留 Host 头和 WebSocket 转发。
+
+4. 更新与备份
+--------------
+
+更新时先备份 data 目录，再拉取新镜像并执行：
+
+  docker compose pull
+  docker compose up -d --wait
+
+必须同时备份 data/dashboard.sqlite3、data/encryption.key 和 data/jwt.key。恢复前执行
+`docker compose down`，解压 data 目录后再启动。不要把 data 目录或导出的 Session 提交到 Git。
+
+5. 架构限制
+------------
+
+当前版本使用 SQLite 和内存中的 APScheduler，必须保持单 worker、单容器、单副本运行。
+真实 Telegram 登录、发信、AI 能力和通知渠道需要使用者自己的账号、网络和 API 凭据。
