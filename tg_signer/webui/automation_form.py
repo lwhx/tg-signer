@@ -104,12 +104,18 @@ def build_relay_rule(
             raw_group = str(target.get("group", "1")).strip()
             if not raw_group:
                 raise ValueError(f"第 {index} 个目标需要捕获组")
+            compiled = re.compile(clean["pattern"])
             if re.fullmatch(r"\d+", raw_group):
-                clean["group"] = int(raw_group)
+                parsed_group: int | str = int(raw_group)
+                if parsed_group > compiled.groups:
+                    raise ValueError(f"第 {index} 个目标没有对应的捕获组")
             elif raw_group.isidentifier():
-                clean["group"] = raw_group
+                parsed_group = raw_group
+                if parsed_group not in compiled.groupindex:
+                    raise ValueError(f"第 {index} 个目标未定义命名捕获组")
             else:
                 raise ValueError(f"第 {index} 个目标的捕获组无效")
+            clean["group"] = parsed_group
             clean["all_matches"] = bool(target.get("all_matches", False))
         if mode == "template":
             template = target.get("template") or ""
@@ -148,23 +154,30 @@ def editable_rule(rule: dict[str, Any]) -> bool:
     triggers = rule.get("triggers") or []
     handlers = rule.get("handlers") or []
     return (
-        len(triggers) == 1
+        set(rule) <= {"id", "enabled", "triggers", "filters", "handlers", "vars"}
+        and len(triggers) == 1
+        and isinstance(triggers[0], dict)
+        and set(triggers[0]) <= {"type", "params"}
         and triggers[0].get("type") == "message"
         and set(triggers[0].get("params", {}))
         <= {"chat_id", "chat_ids", "from_user_ids"}
         and len(handlers) == 1
+        and isinstance(handlers[0], dict)
+        and set(handlers[0]) <= {"handler", "params"}
         and handlers[0].get("handler") == "relay_message"
+        and isinstance(handlers[0].get("params", {}), dict)
         and not rule.get("vars")
         and set((rule.get("filters") or {}))
         <= {"text_rule", "text_value", "ignore_case"}
         and set(handlers[0].get("params", {})) <= {"ignore_self", "targets"}
+        and isinstance(handlers[0].get("params", {}).get("targets", []), list)
         and all(
-            set(target) <= {
+            isinstance(target, dict)
+            and set(target) <= {
                 "chat_id", "mode", "dedup", "pattern", "group",
                 "all_matches", "template"
             }
             for target in handlers[0].get("params", {}).get("targets", [])
-            if isinstance(target, dict)
         )
     )
 
