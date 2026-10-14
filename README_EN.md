@@ -1,3 +1,7 @@
+# lwhx/tg-signer
+
+**General-purpose Telegram message monitoring and forwarding platform** built on [amchii/tg-signer](https://github.com/amchii/tg-signer), preserving upstream check-ins and automation features under BSD-3-Clause. See [Message Relay](docs/message-relay.md), [generic examples](examples/message_relay_basic.json) and [115 bot example](examples/115_long_anime.json).
+
 ## Telegram Daily Auto Check-in / Personal, Group, and Channel Message Monitoring with Auto Reply
 
 [简体中文](./README.md)
@@ -8,6 +12,7 @@
 - Click keyboard buttons based on configured text
 - Use AI for image recognition and click the matching keyboard button
 - Monitor personal, group, and channel messages, then forward or auto-reply
+- Multi-target relay: forward/copy/text/regex extraction/template with SQLite deduplication (this edition)
 - Execute action flows based on configuration
 
   **...**
@@ -17,13 +22,13 @@
 Requires Python 3.10 or above.
 
 ```sh
-pip install -U tg-signer
+pip install -U "lwhx-tg-signer @ git+https://github.com/lwhx/tg-signer.git"
 ```
 
 Or install the performance extras:
 
 ```sh
-pip install "tg-signer[speedup]"
+pip install "lwhx-tg-signer[speedup] @ git+https://github.com/lwhx/tg-signer.git"
 ```
 
 #### WebUI
@@ -31,7 +36,7 @@ pip install "tg-signer[speedup]"
 `tg-signer` also ships with a WebUI. Install it with:
 
 ```sh
-pip install "tg-signer[gui]"
+pip install "lwhx-tg-signer[gui] @ git+https://github.com/lwhx/tg-signer.git"
 ```
 
 ![webgui](./assets/webui.jpeg)
@@ -41,8 +46,8 @@ pip install "tg-signer[gui]"
 #### GitHub Container Registry
 
 Two prebuilt images are published on GitHub Container Registry:
-`ghcr.io/amchii/tg-signer:<tag>` (CLI) and
-`ghcr.io/amchii/tg-signer:<tag>-webui` (CLI + WebUI).
+`ghcr.io/lwhx/tg-signer:<tag>` (CLI) and
+`ghcr.io/lwhx/tg-signer:<tag>-webui` (CLI + WebUI).
 
 #### Local
 

@@ -3,7 +3,7 @@
 工作目录下添加`start.sh`:
 
 ```sh
-pip install -U tg-signer
+pip install -U "lwhx-tg-signer @ git+https://github.com/lwhx/tg-signer.git"
 
 # 首次配置时使用，后续注释掉
 sleep infinity
@@ -16,10 +16,10 @@ sleep infinity
 
 发布版本会同步到 GitHub Container Registry：
 
-- `ghcr.io/amchii/tg-signer:<tag>`
-- `ghcr.io/amchii/tg-signer:latest`（当推送合法 Docker tag 格式的 Git tag，例如 `v0.0.0`、`0.0.0`、`v0.0.0-beta` 时更新）
-- `ghcr.io/amchii/tg-signer:<tag>-webui`
-- `ghcr.io/amchii/tg-signer:latest-webui`（当推送合法 Docker tag 格式的 Git tag，例如 `v0.0.0`、`0.0.0`、`v0.0.0-beta` 时更新）
+- `ghcr.io/lwhx/tg-signer:<tag>`
+- `ghcr.io/lwhx/tg-signer:latest`（当推送合法 Docker tag 格式的 Git tag，例如 `v0.0.0`、`0.0.0`、`v0.0.0-beta` 时更新）
+- `ghcr.io/lwhx/tg-signer:<tag>-webui`
+- `ghcr.io/lwhx/tg-signer:latest-webui`（当推送合法 Docker tag 格式的 Git tag，例如 `v0.0.0`、`0.0.0`、`v0.0.0-beta` 时更新）
 
 其中基础镜像默认包含 `speedup` 所需的 `tgcrypto`，`-webui` 变体会额外安装 `gui` 额外依赖（当前包含 `nicegui`）并默认监听 `8080` 端口。
 如果你需要使用国内镜像源或调整构建参数，仍然可以继续按下文方式在本地构建。
@@ -41,7 +41,7 @@ CLI 镜像示例：
 docker run -d --name tg-signer \
   --volume $PWD:/opt/tg-signer \
   --env TG_PROXY=socks5://172.17.0.1:7890 \
-  ghcr.io/amchii/tg-signer:latest bash start.sh
+  ghcr.io/lwhx/tg-signer:latest bash start.sh
 ```
 
 WebUI 镜像示例：
@@ -51,7 +51,7 @@ docker run -d --name tg-signer-webui \
   --volume $PWD:/opt/tg-signer \
   --publish 8080:8080 \
   --env TG_SIGNER_GUI_AUTHCODE=change-me \
-  ghcr.io/amchii/tg-signer:latest-webui
+  ghcr.io/lwhx/tg-signer:latest-webui
 ```
 
 ## 使用Dockerfile

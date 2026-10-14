@@ -15,6 +15,7 @@ from tg_signer.config import HttpCallback, UDPForward
 from tg_signer.core import UserMonitor
 from tg_signer.notification.server_chan import sc_send
 
+from .message_relay import relay_message
 from .models import AutomationContext, Event
 
 # 统一 handler 返回值语义：
@@ -579,10 +580,40 @@ async def random_pick(
     return "continue"
 
 
+async def dispatch_link_to_bot(
+    event: Event, ctx: AutomationContext, params: Dict[str, Any]
+) -> HandlerResult:
+    """Backward-compatible shortcut. Prefer the generic relay_message handler."""
+    target = params.get("bot_chat_id")
+    pattern = params.get("pattern")
+    if not target or not pattern:
+        ctx.log("dispatch_link_to_bot: missing bot_chat_id or pattern", level="WARNING")
+        return "stop"
+    return await relay_message(
+        event,
+        ctx,
+        {
+            "ignore_self": params.get("ignore_self", True),
+            "targets": [
+                {
+                    "chat_id": target,
+                    "mode": "extract",
+                    "pattern": pattern,
+                    "group": params.get("group", 1),
+                    "dedup": params.get("dedup", "content"),
+                    "retry_after_seconds": params.get("retry_after_seconds", 0),
+                }
+            ],
+        },
+    )
+
+
 def register_builtin_handlers() -> None:
     register("send_text", send_text)
     register("reply_text", reply_text)
     register("extract_regex", extract_regex)
+    register("dispatch_link_to_bot", dispatch_link_to_bot)
+    register("relay_message", relay_message)
     register("ai_reply", ai_reply)
     register("blacklist_filter", blacklist_filter)
     register("delay", delay)

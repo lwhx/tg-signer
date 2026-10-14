@@ -1,3 +1,11 @@
+# lwhx/tg-signer
+
+**Telegram 通用消息监控与转发平台**。基于 [amchii/tg-signer](https://github.com/amchii/tg-signer) 二次开发，保留原有签到、监控和自动化规则引擎，遵守 BSD-3-Clause 许可证。
+
+> [通用消息转发使用说明](docs/message-relay.md) | [通用示例配置](examples/message_relay_basic.json) | [115 Bot 场景示例](examples/115_long_anime.json) | [开发路线](docs/lwhx-development.md)
+
+> 安装本仓库源码：`pip install "lwhx-tg-signer @ git+https://github.com/lwhx/tg-signer.git"`。原来的 `pip install tg-signer` 指向上游发布包。
+
 ## Telegram每日自动签到/个人、群组、频道消息监控与自动回复
 
 [English](./README_EN.md)
@@ -8,6 +16,7 @@
 - 根据配置的文本点击键盘
 - 调用AI进行图片识别并点击键盘
 - 个人、群组、频道消息监控、转发与自动回复
+- 通用多目标转发：原生转发、复制、文本转发、正则提取、模板发送和 SQLite 去重（本仓库增强）
 - 根据配置执行动作流
 - 自动化规则引擎（message/timer/startup 触发 + handler 链）
 
@@ -18,24 +27,24 @@
 需要Python3.10及以上
 
 ```sh
-pip install -U tg-signer
+pip install -U "lwhx-tg-signer @ git+https://github.com/lwhx/tg-signer.git"
 ```
 
 或者为了提升程序速度：
 
 ```sh
-pip install "tg-signer[speedup]"
+pip install "lwhx-tg-signer[speedup] @ git+https://github.com/lwhx/tg-signer.git"
 ```
 
 启用 YAML 配置支持：
 
 ```sh
-pip install "tg-signer[yaml]"
+pip install "lwhx-tg-signer[yaml] @ git+https://github.com/lwhx/tg-signer.git"
 ```
 #### WebUI
 tg-signer附带了一个WebUI，安装命令:
 ```sh
-pip install "tg-signer[gui]"
+pip install "lwhx-tg-signer[gui] @ git+https://github.com/lwhx/tg-signer.git"
 ```
 
 ![webgui](./assets/webui.jpeg)
@@ -44,7 +53,7 @@ pip install "tg-signer[gui]"
 ### Docker
 
 #### GitHub Container Registry
-在 GitHub Container Registry 提供了两种预构建镜像：`ghcr.io/amchii/tg-signer:<tag>`（CLI）和 `ghcr.io/amchii/tg-signer:<tag>-webui`（CLI + WebUI）。
+在 GitHub Container Registry 提供了两种预构建镜像：`ghcr.io/lwhx/tg-signer:<tag>`（CLI）和 `ghcr.io/lwhx/tg-signer:<tag>-webui`（CLI + WebUI）。
 
 #### 本地
 如果需要自行构建镜像，本地 build 方式仍然保留，见 [docker](./docker) 目录下的 Dockerfile 和 [README](./docker/README.md) 。
@@ -103,7 +112,7 @@ Commands:
   send-dice               发送一次DICE消息, 请确保当前会话已经"见过"该`chat_id`。...
   send-text               发送一次文本消息, 请确保当前会话已经"见过"该`chat_id`
   version                 Show version
-  webgui                  启动一个WebGUI（需要通过`pip install "tg-signer[gui]"`安装相关依赖）
+  webgui                  启动一个WebGUI（需要通过`pip install "lwhx-tg-signer[gui] @ git+https://github.com/lwhx/tg-signer.git"`安装相关依赖）
 
 ```
 

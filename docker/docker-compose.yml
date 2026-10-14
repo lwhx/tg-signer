@@ -4,17 +4,13 @@ networks:
 
 services:
   tg-signer:
-    build:
-      context: .
-      dockerfile: CN.Dockerfile
-      args:
-        TZ: ${TZ:-Asia/Shanghai}
+    image: ghcr.io/lwhx/tg-signer:latest
     container_name: tg-signer
     command: ["/bin/bash", "start.sh"]
     volumes:
       - $PWD:/opt/tg-signer
     environment:
-      - TG_PROXY=socks5://172.17.0.1:7890
+      - TG_PROXY=${TG_PROXY:-}
       - TZ=${TZ:-Asia/Shanghai}
     networks:
       - tg_host
