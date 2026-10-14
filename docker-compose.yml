@@ -1,75 +1,34 @@
-# Run from the repository root.
-# WebUI: docker compose up -d
-# Optional Automation worker: docker compose --profile automation up -d
-name: tg-signer
-
-x-common: &common
-  init: true
-  restart: unless-stopped
-  # Graceful shutdown allows Telegram session/SQLite writes to finish.
-  stop_grace_period: 40s
-  # Baseline container confinement; no local Docker build required.
-  security_opt:
-    - no-new-privileges:true
-  cap_drop:
-    - ALL
-  tmpfs:
-    - /tmp:size=128m,mode=1777
-  # Optional read-only root filesystem lives in docker-compose.readonly.yml.
-  # Keep ./data writable for sessions, automation rules, and delivery records.
-  volumes:
-    - ./data:/opt/tg-signer
-  environment:
-    TZ: ${TZ:-Asia/Shanghai}
-    TG_PROXY: ${TG_PROXY:-}
-  logging:
-    driver: json-file
-    options:
-      max-size: "10m"
-      max-file: "3"
-
+name: tg-signer-dashboard
 services:
-  webui:
-    <<: *common
-    image: ghcr.io/lwhx/tg-signer:latest-webui
-    container_name: tg-signer-webui
-    # Stable NiceGUI signing secret prevents sessions resetting on every restart.
-    # Override TG_SIGNER_GUI_STORAGE_SECRET for a separate signing key.
-    command:
-      - tg-signer
-      - webgui
-      - --host
-      - 0.0.0.0
-      - --port
-      - "8080"
-      - --storage-secret
-      - ${TG_SIGNER_GUI_STORAGE_SECRET:-${TG_SIGNER_GUI_AUTHCODE:?Set TG_SIGNER_GUI_AUTHCODE in .env}}
+  dashboard:
+    image: ghcr.io/lwhx/tg-signer:latest-dashboard
+    container_name: tg-signer-dashboard
+    restart: unless-stopped
+    init: true
     ports:
-      # Bind to loopback by default; expose only via a secured reverse proxy.
-      - "${WEBUI_BIND_IP:-127.0.0.1}:${WEBUI_PORT:-8080}:8080"
+      - "${WEBUI_BIND_IP:-127.0.0.1}:${WEBUI_PORT:-8999}:8999"
     environment:
       TZ: ${TZ:-Asia/Shanghai}
-      TG_PROXY: ${TG_PROXY:-}
-      TG_SIGNER_GUI_AUTHCODE: ${TG_SIGNER_GUI_AUTHCODE:?Set TG_SIGNER_GUI_AUTHCODE in .env}
-    healthcheck:
-      test:
-        - CMD
-        - python
-        - -c
-        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/', timeout=3)"
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
-
-  automation:
-    <<: *common
-    profiles:
-      - automation
-    image: ghcr.io/lwhx/tg-signer:latest
-    container_name: tg-signer-automation
-    command:
-      - tg-signer
-      - automation
-      - run
-      - "${TG_SIGNER_AUTOMATION_TASK:-example_task}"
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    volumes:
+      - ./data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_READ_SEARCH
+      - FOWNER
+      - SETGID
+      - SETUID
+    stop_grace_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -1,0 +1,16 @@
+.git
+.venv
+.env
+data
+**/node_modules
+**/.next
+**/__pycache__
+upstream/tg-signer/.git
+backups
+**/.pytest_cache
+**/.ruff_cache
+frontend/test-results
+frontend/playwright-report
+frontend/tests
+frontend/out
+release

@@ -1,503 +1,232 @@
-# lwhx/tg-signer
+# lwhx/tg-signer Dashboard · 独立二次开发版
 
-**Telegram 通用消息监控与转发平台**。基于 [amchii/tg-signer](https://github.com/amchii/tg-signer) 二次开发，保留原有签到、监控和自动化规则引擎，遵守 BSD-3-Clause 许可证。
+此项目以 [dongbo501/TG-SIGNER](https://github.com/dongbo501/TG-SIGNER) 的 Dashboard 为基础，在保留 [amchii/tg-signer](https://github.com/amchii/tg-signer) BSD-3-Clause 许可证与来源署名的前提下，集成 lwhx 通用消息转发引擎。
 
-> [通用消息转发使用说明](docs/message-relay.md) | [WebUI 可视化转发配置](docs/webui-relay.md) | [通用示例配置](examples/message_relay_basic.json) | [115 Bot 场景示例](examples/115_long_anime.json) | [开发路线](docs/lwhx-development.md)
+> **迁移注意**：沿用原 Dashboard 的 `./data:/data`，保留 `dashboard.sqlite3`、`encryption.key`、`jwt.key`。升级前备份并停止旧容器。此重建分支合并前不能用于生产环境。
 
-> 安装本仓库源码：`pip install "lwhx-tg-signer @ git+https://github.com/lwhx/tg-signer.git"`。原来的 `pip install tg-signer` 指向上游发布包。
+# tg-signer Dashboard
 
-## Telegram每日自动签到/个人、群组、频道消息监控与自动回复
+面向 Telegram 签到、自动化与消息监控的单容器 Web 控制台（当前版本：`1.1.0`）。
 
-[English](./README_EN.md)
+源码仓库：<https://github.com/dongbo501/TG-SIGNER> · 上游执行器：<https://github.com/amchii/tg-signer>
 
-### 功能
+基于 [amchii/tg-signer](https://github.com/amchii/tg-signer) 的中文 Web 控制台。前后端、Telegram 协议库和 tg-signer **打包在一个 Docker 镜像、一个运行容器中**。无需另外部署 Node、Nginx、Redis 或数据库容器。
 
-- 每日定时和随机误差时间签到
-- 根据配置的文本点击键盘
-- 调用AI进行图片识别并点击键盘
-- 个人、群组、频道消息监控、转发与自动回复
-- 通用多目标转发：原生转发、复制、文本转发、正则提取、模板发送和 SQLite 去重（本仓库增强）
-- WebUI：可视化创建/修改/删除 Automation 转发规则、正则捕获测试（本仓库增强）
-- 根据配置执行动作流
-- 自动化规则引擎（message/timer/startup 触发 + handler 链）
+前端采用 Next.js 14 App Router 静态导出、React、Tailwind CSS、Shadcn 风格的 Radix UI 组件、TanStack Table、Lucide、Zustand 和 Recharts；FastAPI 同时提供静态网页、REST API 与 WebSocket；前端支持 EventSource 自动回退。后端采用 SQLAlchemy + SQLite WAL、APScheduler、Kurigram（兼容 Pyrogram）。
 
-  **...**
+上游代码固定于 `fc8905db2ee74e2d9afc135cce88b50be35b6212`，版本 `0.9.1`，保留完整源码和 BSD-3-Clause 许可证。功能依据上游 README、配置模型、签到/监控执行器、automation 引擎及使用文档实现。未修改上游源码。
 
-### 安装
+## 1. 项目目录
 
-需要Python3.10及以上
-
-```sh
-pip install -U "lwhx-tg-signer @ git+https://github.com/lwhx/tg-signer.git"
+```text
+.
+├── Dockerfile                    # 多阶段构建，最终只有一个 Python 运行容器
+├── docker-compose.yml            # 唯一服务 dashboard，包含全部安装参数
+├── scripts/
+│   └── backup.sh                 # 停机一致性备份，自动恢复运行
+├── backend/
+│   ├── requirements.txt
+│   ├── app/
+│   │   ├── main.py               # REST API、Cookie 鉴权、WS、静态页面
+│   │   ├── auth.py               # Telegram 多步骤登录状态机
+│   │   ├── security.py           # Argon2、JWT、Fernet 加密、限流
+│   │   ├── schemas.py            # Pydantic 请求与上游配置校验
+│   │   ├── db.py                 # SQLAlchemy 模型和 SQLite
+│   │   ├── telegram.py           # 共享客户端、无交互登录、上游适配
+│   │   ├── engine.py             # 随机调度、任务执行、规则审计
+│   │   ├── events.py             # 日志桥接、有界 WebSocket 队列
+│   │   └── notifications.py      # 五种通知渠道
+│   └── tests/                    # API、鉴权、登录状态机、调度与匹配测试
+├── frontend/
+│   ├── app/{layout.tsx,page.tsx,globals.css}
+│   ├── components/
+│   │   ├── auth-dialog.tsx        # useReducer 登录状态机
+│   │   ├── task-editor.tsx        # 动作表单、完整 JSON、YAML 导入
+│   │   ├── schedule-picker.tsx    # 鼠标/键盘选择时间与重复频率
+│   │   ├── logs.tsx              # WS 终端与分页执行历史
+│   │   ├── settings.tsx
+│   │   ├── tools.tsx
+│   │   ├── common.tsx            # TanStack Table 等通用组件
+│   │   └── ui/                   # Radix / Shadcn UI 基础组件
+│   ├── lib/{api.ts,store.ts,utils.ts,schedule.ts}
+│   ├── tests/dashboard.spec.ts    # Playwright 浏览器回归
+│   └── package-lock.json
+├── upstream/tg-signer/            # 固定版本的完整上游
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── FEATURES.md                # 上游能力到网页入口的逐项映射
+│   └── VERIFICATION.md
+└── data/                         # 唯一持久数据目录，不进入镜像/版本控制
+    ├── dashboard.sqlite3
+    ├── encryption.key
+    ├── jwt.key
+    ├── initial-password.txt      # 首次随机密码，修改后删除
+    └── upstream/                 # 上游记录、规则状态、自定义插件
 ```
 
-或者为了提升程序速度：
+## 2. Telegram 登录状态机与完整代码
 
-```sh
-pip install "lwhx-tg-signer[speedup] @ git+https://github.com/lwhx/tg-signer.git"
+后端完整实现：[backend/app/auth.py](backend/app/auth.py)。前端完整实现：[frontend/components/auth-dialog.tsx](frontend/components/auth-dialog.tsx)。路由：[backend/app/main.py](backend/app/main.py)。
+
+```mermaid
+stateDiagram-v2
+    [*] --> PARAMETERS
+    PARAMETERS --> CODE_SENT: send-code / connect + send_code
+    CODE_SENT --> CODE_SENT: 60 秒后 resend_code，更新 hash
+    CODE_SENT --> CODE_SENT: 验证码错误，可重试
+    CODE_SENT --> TWO_FA: sign_in 抛出 SessionPasswordNeeded
+    CODE_SENT --> AUTHORIZED: sign_in 成功
+    TWO_FA --> TWO_FA: PasswordHashInvalid，可重试
+    TWO_FA --> AUTHORIZED: check_password 成功
+    AUTHORIZED --> [*]: get_me + 加密 Session 入库 + disconnect
+    CODE_SENT --> EXPIRED: 十分钟 / 取消 / 服务重启
+    TWO_FA --> EXPIRED: 十分钟 / 取消 / 服务重启
+    EXPIRED --> PARAMETERS: 重新开始
 ```
 
-启用 YAML 配置支持：
+- `POST /api/auth/send-code`：手机号、自定义或默认 API、独立代理；返回随机 `flow_id`、`phone_code_hash`、重发倒计时。
+- `POST /api/auth/sign-in`：验证 flow、hash、验证码；返回 `AUTHORIZED` 或 `2FA_REQUIRED`。
+- `POST /api/auth/check-2fa`：仅允许在 `2FA_REQUIRED` 状态提交密码。
+- `DELETE /api/auth/flows/{flow_id}`：取消并清理连接。
+- 每个流程单独加锁，最多八次验证尝试、十分钟有效期；每个手机号限频，最多二十个未完成流程。错误请求不会越过状态机。
+- 不调用 Pyrogram 交互式 `start()` 获取验证码，不保存验证码、2FA 密码或待登录流程到数据库。成功后 Session、API_HASH、代理凭据以 Fernet 加密。
+- 导入支持 **Pyrogram/Kurigram** Session String 与 `.session` SQLite 文件；先验证实际授权，再保存。Telethon 文件不是相同格式，会明确拒绝而不是错误识别。
 
-```sh
-pip install "lwhx-tg-signer[yaml] @ git+https://github.com/lwhx/tg-signer.git"
-```
-#### WebUI
-tg-signer附带了一个WebUI，安装命令:
-```sh
-pip install "lwhx-tg-signer[gui] @ git+https://github.com/lwhx/tg-signer.git"
-```
+## 3. 数据表与任务执行
 
-![webgui](./assets/webui.jpeg)
+完整 SQLAlchemy 模型位于 [backend/app/db.py](backend/app/db.py)。
 
+| 表 | 关键字段 | 用途 |
+|---|---|---|
+| `accounts` | `user_id UNIQUE`、`session`、`api_hash`、`proxy`、状态、头像、最后验证时间 | 账号与加密凭据 |
+| `tasks` | `account_id FK`、`kind`、`enabled`、`cron`、时区、随机上下限、正则、完整 `config JSON`、`next_run` | 三种任务统一管理 |
+| `runs` | 账号/任务外键与名称快照、开始/完成时间、结果、摘要、Telegram 原文 | 签到及每次自动化规则的执行审计 |
+| `settings` | `key PRIMARY KEY`、`value` | 密码哈希、JWT 版本、代理、AI、加密通知配置 |
 
-### Docker
+删除任务会保留历史执行快照；绑定任务的账号不能直接删除。SQLite 使用 WAL、外键约束与 30 秒 busy timeout。
 
-#### GitHub Container Registry
-在 GitHub Container Registry 提供了两种预构建镜像：`ghcr.io/lwhx/tg-signer:<tag>`（CLI）和 `ghcr.io/lwhx/tg-signer:<tag>-webui`（CLI + WebUI）。
+随机执行时间 = 标准五段 Cron 的下一次时间 + `[delay_min, delay_max]` 范围内随机秒数，采样后写入数据库。Cron 按 POSIX 语义解释（0/7 为周日）。APScheduler 执行持久时间对应的单次作业。重启后恢复时间，五分钟内的过期调度补执行一次，更久的错过任务跳到下一次；同一任务拒绝并发触发，同账号签到与工具操作串行执行。手动运行立即进入队列，不再叠加随机等待。
 
-**推荐 Docker Compose 部署：** 仓库根目录提供 [docker-compose.yml](./docker-compose.yml) 和 [.env.example](./.env.example)，默认启动 WebUI，可选启用消息监听工作进程，数据统一保存在 `./data`。默认启用禁止提权、移除容器 capabilities 和临时目录隔离；额外的 [只读文件系统覆盖配置](./docker-compose.readonly.yml) 可按需启用。详细步骤见 [Docker 部署指南](./docs/docker-deploy.md)。
+网页调度使用时间选择器，可点击选择或键盘输入 `08:30`，支持每天、工作日、周末、每周指定星期、每月指定日期。每月日期支持多选，例如每月 1、15、28 日均在同一时间执行；当月没有的日期会跳过，其余所选日期照常执行。任务列表显示中文计划，正常配置无需输入 Cron。导入的复杂计划会原样保留，直到明确选择新的重复频率。后端与配置导出仍使用兼容上游的 Cron 格式。
 
-#### 本地
-如果需要自行构建镜像，本地 build 方式仍然保留，见 [docker](./docker) 目录下的 Dockerfile 和 [README](./docker/README.md) 。
+五种签到动作直接复用上游 `UserSigner` 和 Telegram API 限速/FloodWait 包装器，额外捕获普通消息、编辑消息和按钮回调提示。成功正则逐目标校验，失败规则优先；缺少成功规则时记录为 **completed（动作完成，未验证签到成功）**。不同话题和自己发出的消息不会被误计为成功回复。正则匹配设置执行时间预算。
 
-### 使用方法
+Automation 复用上游触发器、过滤器、模板、handler、持久状态；Monitor 保留上游兼容行为。每次规则处理单独写入执行历史，监听任务可启停，服务重启会恢复启用的监听。
 
-```
-Usage: tg-signer [OPTIONS] COMMAND [ARGS]...
+## 4. 单容器部署
 
-  使用<子命令> --help查看使用说明
+镜像发布在 `ghcr.io/lwhx/tg-signer:latest-dashboard`（Linux amd64）。在项目目录（或只放一份 `docker-compose.yml` 的目录）中执行：
 
-子命令别名:
-  run_once -> run-once
-  send_text -> send-text
-
-Options:
-  -l, --log-level [debug|info|warn|error]
-                                  日志等级, `debug`, `info`, `warn`, `error`
-                                  [default: info]
-  --log-file PATH                 日志文件路径, 可以是相对路径  [default: logs/tg-
-                                  signer.log]
-  --log-dir PATH                  日志文件目录, 可以是相对路径  [default: logs]
-  -p, --proxy TEXT                代理地址, 例如: socks5://127.0.0.1:1080,
-                                  会覆盖环境变量`TG_PROXY`的值  [env var: TG_PROXY]
-  --session_dir PATH              存储TG Sessions的目录, 可以是相对路径  [default: .]
-  -a, --account TEXT              自定义账号名称，对应session文件名为<account>.session  [env
-                                  var: TG_ACCOUNT; default: my_account]
-  -w, --workdir PATH              tg-signer工作目录，用于存储配置和签到记录等  [default:
-                                  .signer]
-  --session-string TEXT           Telegram Session String,
-                                  会覆盖环境变量`TG_SESSION_STRING`的值  [env var:
-                                  TG_SESSION_STRING]
-  --in-memory                     是否将session存储在内存中，默认为False，存储在文件
-  --help                          Show this message and exit.
-
-Commands:
-  export                  导出配置，默认为输出到终端。
-  import                  导入配置，默认为从终端读取。
-  list                    列出已有配置
-  list-members            查询聊天（群或频道）的成员, 频道需要管理员权限
-  list-folders            列出 Telegram 普通对话 Folder
-  list-sign-records       列出最近N条签到记录
-  list-topics             列出群组话题ID（message_thread_id）
-  list-schedule-messages  显示已配置的定时消息
-  llm-config              配置大模型API
-  login                   登录账号（用于获取session）
-  migrate-sign-records    将签到记录从 JSON 迁移到 SQLite（默认保留原...
-  logout                  登出账号并删除session文件
-  automation              配置和运行自动化规则（推荐，覆盖monitor能力）
-  monitor                 配置和运行监控
-  multi-run               使用一套配置同时运行多个账号
-  reconfig                重新配置
-  run                     根据任务配置运行签到
-  run-once                运行一次签到任务，即使该签到任务今日已执行过
-  schedule-messages       批量配置Telegram自带的定时发送消息功能
-  send-dice               发送一次DICE消息, 请确保当前会话已经"见过"该`chat_id`。...
-  send-text               发送一次文本消息, 请确保当前会话已经"见过"该`chat_id`
-  version                 Show version
-  webgui                  启动一个WebGUI（需要通过`pip install "lwhx-tg-signer[gui] @ git+https://github.com/lwhx/tg-signer.git"`安装相关依赖）
-
+```bash
+docker compose pull
+docker compose up -d --wait
 ```
 
-例如:
+默认端口映射为 `127.0.0.1:8999:8999`，访问 **http://127.0.0.1:8999**。全部安装参数直接在 `docker-compose.yml` 中修改，无需 `.env` 文件：
 
-```sh
-tg-signer run
-tg-signer run my_sign  # 不询问，直接运行'my_sign'任务
-tg-signer run-once my_sign  # 直接运行一次'my_sign'任务
-tg-signer list-folders  # 列出 Telegram 普通 Folder 的 ID、名称和显式对话数量
-tg-signer login --from-folder Sign  # 登录账号并从 Sign Folder 发现对话
-tg-signer run --from-folder Sign my_sign  # 从 Sign Folder 发现对话后运行任务
-tg-signer list-sign-records linuxdo -n 5  # 查看任务 linuxdo 最近 5 条签到记录
-tg-signer migrate-sign-records  # 将.signer/signs 下的签到记录迁移到 SQLite
-tg-signer send-text 8671234001 /test  # 向chat_id为'8671234001'的聊天发送'/test'文本
-tg-signer send-text @neo /test  # 向username为'@neo'的聊天发送'/test'文本
-tg-signer send-text --message-thread-id 1 -- -1003763902761 checkin  # 发送到群组话题(message_thread_id=1)
-tg-signer send-text -- -10006758812 浇水  # 对于负数需要使用POSIX风格，在短横线'-'前方加上'--'
-tg-signer send-text --delete-after 1 8671234001 /test  # 向chat_id为'8671234001'的聊天发送'/test'文本, 并在1秒后删除发送的消息
-tg-signer list-members --chat_id -1001680975844 --admin  # 列出频道的管理员
-tg-signer list-topics --chat_id -1003763902761 --limit 50  # 列出群组话题及message_thread_id
-tg-signer schedule-messages --crontab '0 0 * * *' --next-times 10 -- -1001680975844 你好  # 在未来10天的每天0点向'-1001680975844'发送消息
-tg-signer schedule-messages --crontab '0 0 * * *' --next-times 3 --message-thread-id 1 -- -1003763902761 你好  # 配置群组话题的定时消息
-tg-signer automation init my_auto  # 初始化自动化模板
-tg-signer automation run my_auto  # 运行自动化任务
-tg-signer monitor run  # 配置个人、群组、频道消息监控与自动回复
-tg-signer multi-run -a account_a -a account_b same_task  # 使用'same_task'的配置同时运行'account_a'和'account_b'两个账号
-tg-signer webgui --auth-code averycomplexcode  # 启动一个WebGUI
+```yaml
+ports:
+  - "127.0.0.1:8999:8999"
+environment:
+  TZ: "Asia/Shanghai"
+  COOKIE_SECURE: "false"
+  ADMIN_PASSWORD: ""
 ```
 
-### 自动化规则（automation）
+首次密码：
 
-推荐使用 `tg-signer automation` 统一管理自动化规则（覆盖 monitor 能力）。
-
-```sh
-tg-signer automation init my_auto
-# 编辑 .signer/automations/my_auto/config.json
-tg-signer automation run my_auto
+```bash
+sudo cat data/initial-password.txt
 ```
 
-更多详细使用说明与示例见：`docs/automation_usage.md`
+容器内读取也可以：
 
-### 配置代理（如有需要）
-
-`tg-signer`不读取系统代理，可以使用环境变量 `TG_PROXY`或命令参数`--proxy`进行配置
-
-例如：
-
-```sh
-export TG_PROXY=socks5://127.0.0.1:7890
+```bash
+docker compose exec dashboard cat /data/initial-password.txt
 ```
 
-### 登录
+设置页可修改密码；变更会撤销所有旧 JWT。也可以在首次初始化前修改 `docker-compose.yml` 的 `environment.ADMIN_PASSWORD`，设置至少十二位的密码；留空则自动生成。之后修改此参数不会覆盖已保存的密码。
 
-```sh
-tg-signer login
+最终镜像只包含 Python 运行时、构建好的前端、tg-signer 与依赖。容器以 root 启动，仅用于把 `/data` 属主修正为 UID 10001，随后降权为 UID 10001 运行且不保留任何 Linux capability；根文件系统只读；`/data` 挂载可写，`/tmp` 使用 tmpfs。容器监听 8999，静态页面、API、WebSocket 使用同一来源。**请维持单 worker 和单副本**，以免重复调度和 Telegram Session 争用。
+
+远程通过 SSH 访问：
+
+```bash
+ssh -L 8999:127.0.0.1:8999 root@服务器地址
+# 然后在自己电脑打开 http://127.0.0.1:8999
 ```
 
-根据提示输入手机号码和验证码进行登录并获取最近的聊天列表，确保你想要签到的聊天在列表内。
-签到任务里的`chat_id`同时支持整数ID和以`@`开头的username，例如`@neo`。
-对于论坛群组，登录输出中会额外打印每个话题的 `message_thread_id`，可直接用于 `--message-thread-id`。
+如需直接绑定其他地址，修改 `docker-compose.yml` 的 `ports`，例如 `"0.0.0.0:8999:8999"`；修改宿主机端口时保留最后的容器端口 `8999`。面向公网使用现有 HTTPS 反向代理，并在同一文件的 `environment` 中设置 `COOKIE_SECURE: "true"`；代理应保留 Host 并支持 WebSocket。修改配置后执行 `docker compose up -d --wait` 生效。项目不会修改机器已有的代理或其他容器。
 
-如果目标对话不在最近列表中，可以在 Telegram 新建一个普通 Folder，手动把目标对话加入其中，然后按名称或 ID 加载：
+管理命令：
 
-```sh
-tg-signer list-folders
-tg-signer login --from-folder Sign
-# 名称重复时使用 ID
-tg-signer login --from-folder 2
+```bash
+docker compose ps                         # 健康状态
+docker compose logs --tail=100 -f          # 服务日志
+docker compose restart                   # 重启
+docker compose pull && docker compose up -d --wait   # 更新
+docker compose down                      # 删除唯一容器和项目网络，保留 data
+# 删除镜像（可选）
+docker image rm ghcr.io/lwhx/tg-signer:latest-dashboard
 ```
 
-`--from-folder` 表示“从 Folder 发现对话”，也适用于 `run`、`run-once`、`multi-run`、`automation run` 和 `monitor run`。指定后会加载 Folder 中所有手动加入或置顶的对话，`--num-of-dialogs` 不再生效。当前不支持按联系人、非联系人、机器人、群组或频道等动态规则生成成员的 Folder；请使用只包含手动添加对话的普通 Folder。
+彻底删除账号和密钥时，在确认备份不再需要后再删除 `data/`。`docker compose down -v` 不会删除这里使用的宿主机绑定目录。
 
-### 时区
+备份与恢复：
 
-调度相关命令（如 `run` 和 `schedule-messages`）会按以下顺序解析时区：
-
-1. 环境变量 `TZ`
-2. Python 识别到的本地时区
-3. 默认回退到 `Asia/Shanghai`
-
-如果你需要按特定时区计算下次执行时间，直接在运行前设置 `TZ` 即可。
-
-### 获取群组话题 ID
-
-```sh
-tg-signer list-topics --chat_id -1003763902761
+```bash
+./scripts/backup.sh
+# 恢复：先 docker compose down，再解压备份到项目目录
+# sudo tar -xzf backups/tg-signer-时间戳.tar.gz -C .
+# （无需手动 chown，容器启动时会自动修正 data 属主）
+# docker compose up -d --wait
 ```
 
-会输出该论坛群组可见话题的 `message_thread_id`、标题及状态，便于配置签到到指定话题。
+必须把数据库与 `encryption.key`、`jwt.key` 一起备份。丢失加密密钥将无法解密已有会话。不要把数据目录或导出的 Session 提交到 Git。
 
-### 发送一次消息
+Swagger：登录后打开 **http://127.0.0.1:8999/api/docs**；OpenAPI JSON：`/api/openapi.json`。
 
-```sh
-tg-signer send-text 8671234001 hello  # 向chat_id为'8671234001'的聊天发送'hello'文本
-tg-signer send-text @neo hello  # 向username为'@neo'的聊天发送'hello'文本
+## 功能与验证边界
+
+网页支持签到/自动化/Monitor、全部五种动作、多账号执行、配置导入导出、Folder 与话题、成员查询、Telegram 定时消息、记录迁移、Python handler 插件、AI 设置和五种失败通知。详细映射见 [docs/FEATURES.md](docs/FEATURES.md)。
+
+真实 Telegram 登录/发信、AI 识别与外部通知需要您自己的有效账号、网络/API Key 和通知渠道。交付测试使用隔离的临时数据库和模拟 Telegram 返回，**未冒用真实账号、未向外部发送测试消息，未宣称线上签到已验证**。首次实际使用请先添加账号、测试连接，再手动执行一个目标任务检查回复匹配。
+
+完整验证记录见 [docs/VERIFICATION.md](docs/VERIFICATION.md)。
+
+## 本地开发
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r backend/requirements.txt -e './upstream/tg-signer[yaml]'
+.venv/bin/pip install pytest pytest-asyncio ruff
+npm --prefix frontend ci
+npm --prefix frontend run build
+DATA_DIR=/tmp/tg-dashboard-dev STATIC_DIR=frontend/out \
+  .venv/bin/uvicorn backend.app.main:app --host 127.0.0.1 --port 8081
 ```
 
-### 运行签到任务
+静态导出与后端同源，修改页面后重新构建。启动会在开发数据目录生成独立初始密码。
 
-```sh
-tg-signer run
+```bash
+.venv/bin/ruff check backend
+.venv/bin/python -m pytest -q backend/tests
+.venv/bin/python -m pytest -q upstream/tg-signer/tests
+npm --prefix frontend run typecheck
+cd frontend
+npx playwright install chromium
+npm run test:e2e
 ```
 
-或预先执行任务名：
+## 镜像构建与发布
 
-```sh
-tg-signer run linuxdo
+镜像地址：`ghcr.io/lwhx/tg-signer:latest-dashboard`（Linux amd64）。部署方式见上文「单容器部署」，
+详细说明见 [release/INSTALL.txt](release/INSTALL.txt)。镜像不包含账号、任务数据或密钥。
+
+从源码重新构建并发布镜像：
+
+```bash
+# 先完成本地测试，再构建
+docker build -t ghcr.io/lwhx/tg-signer:latest-dashboard .
+docker push ghcr.io/lwhx/tg-signer:latest-dashboard
 ```
-
-根据提示进行配置即可。
-
-#### 示例：
-
-```
-开始配置任务<linuxdo>
-第1个签到
-一. Chat ID（登录时最近对话输出中的ID或@username）: 7661096533
-二. Chat名称（可选）: jerry bot
-三. 是否发送到话题（message_thread_id）？(y/N)：y
-四. message_thread_id: 1
-五. 开始配置<动作>，请按照实际签到顺序配置。
-  1: 发送普通文本
-  2: 发送Dice类型的emoji
-  3: 根据文本点击键盘
-  4: 根据图片选择选项
-  5: 回复计算题
-
-第1个动作:
-1. 输入对应的数字选择动作: 1
-2. 输入要发送的文本: checkin
-3. 是否继续添加动作？(y/N)：y
-第2个动作:
-1. 输入对应的数字选择动作: 3
-2. 键盘中需要点击的按钮文本: 签到
-3. 是否继续添加动作？(y/N)：y
-第3个动作:
-1. 输入对应的数字选择动作: 4
-图片识别将使用大模型回答，请确保大模型支持图片识别。
-2. 是否继续添加动作？(y/N)：y
-第4个动作:
-1. 输入对应的数字选择动作: 5
-计算题将使用大模型回答。
-2. 是否继续添加动作？(y/N)：y
-第5个动作:
-1. 输入对应的数字选择动作: 2
-2. 输入要发送的骰子（如 🎲, 🎯）: 🎲
-3. 是否继续添加动作？(y/N)：n
-在运行前请通过环境变量正确设置`OPENAI_API_KEY`, `OPENAI_BASE_URL`。默认模型为"gpt-4o", 可通过环境变量`OPENAI_MODEL`更改。
-六. 等待N秒后删除签到消息（发送消息后等待进行删除, '0'表示立即删除, 不需要删除直接回车）, N: 10
-╔════════════════════════════════════════════════╗
-║ Chat ID: 7661096533                            ║
-║ Name: jerry bot                                ║
-║ Message Thread ID: 1                           ║
-║ Delete After: 10                               ║
-╟────────────────────────────────────────────────╢
-║ Actions Flow:                                  ║
-║ 1. [发送普通文本] Text: checkin                ║
-║ 2. [根据文本点击键盘] Click: 签到              ║
-║ 3. [根据图片选择选项]                          ║
-║ 4. [回复计算题]                                ║
-║ 5. [发送Dice类型的emoji] Dice: 🎲              ║
-╚════════════════════════════════════════════════╝
-第1个签到配置成功
-
-继续配置签到？(y/N)：n
-每日签到时间（time或crontab表达式，如'06:00:00'或'0 6 * * *'）:
-签到时间误差随机秒数（默认为0）: 300
-```
-
-### 配置与运行监控
-说明：monitor 为 legacy 功能，推荐使用 `tg-signer automation` 统一管理自动化规则。
-
-```sh
-tg-signer monitor run my_monitor
-```
-
-根据提示进行配置。
-
-#### 示例：
-
-```
-开始配置任务<my_monitor>
-聊天chat id和用户user id均同时支持整数id和字符串username, username必须以@开头，如@neo
-
-配置第1个监控项
-1. Chat ID（登录时最近对话输出中的ID）: -4573702599
-2. 匹配规则('exact', 'contains', 'regex', 'all'): contains
-3. 规则值（不可为空）: kfc
-4. 只匹配来自特定用户ID的消息（多个用逗号隔开, 匹配所有用户直接回车）: @neo
-5. 默认发送文本: V Me 50
-6. 从消息中提取发送文本的正则表达式:
-7. 等待N秒后删除签到消息（发送消息后等待进行删除, '0'表示立即删除, 不需要删除直接回车）, N:
-继续配置？(y/N)：y
-
-配置第2个监控项
-1. Chat ID（登录时最近对话输出中的ID）: -4573702599
-2. 匹配规则('exact', 'contains', 'regex'): regex
-3. 规则值（不可为空）: 参与关键词：「.*?」
-4. 只匹配来自特定用户ID的消息（多个用逗号隔开, 匹配所有用户直接回车）: 61244351
-5. 默认发送文本:
-6. 从消息中提取发送文本的正则表达式: 参与关键词：「(?P<keyword>(.*?))」\n
-7. 发送文本模板（可用{extracted}/{group1}/命名分组；不需要则直接回车）: 我要参与 {keyword}
-8. 等待N秒后删除签到消息（发送消息后等待进行删除, '0'表示立即删除, 不需要删除直接回车）, N: 5
-继续配置？(y/N)：y
-
-配置第3个监控项
-1. Chat ID（登录时最近对话输出中的ID）: -4573702599
-2. 匹配规则(exact, contains, regex, all): all
-3. 只匹配来自特定用户ID的消息（多个用逗号隔开, 匹配所有用户直接回车）:
-4. 总是忽略自己发送的消息（y/N）: y
-5. 默认发送文本（不需要则回车）:
-6. 是否使用AI进行回复(y/N): n
-7. 从消息中提取发送文本的正则表达式（不需要则直接回车）:
-8. 是否通过Server酱推送消息(y/N): n
-9. 是否需要转发到外部（UDP, Http）(y/N): y
-10. 是否需要转发到UDP(y/N): y
-11. 请输入UDP服务器地址和端口（形如`127.0.0.1:1234`）: 127.0.0.1:9999
-12. 是否需要转发到Http(y/N): y
-13. 请输入Http地址（形如`http://127.0.0.1:1234`）: http://127.0.0.1:8000/tg/user1/messages
-继续配置？(y/N)：n
-
-```
-
-#### 示例解释：
-
-1. 聊天`chat id`和用户`user id`均同时支持整数**id**和字符串**username**, username**必须以@开头** 如"neo"输入"@neo"，注意*
-   *username** 可能不存在，示例中`chat id`为-4573702599表示规则只对-4573702599对应的聊天有效。
-
-2. 匹配规则，目前皆**忽略大小写**：
-
-    1. `exact` 为精确匹配，消息必须精确等于该值。
-
-    2. `contains` 为包含匹配，如contains="kfc"，那么只要收到的消息中包含"kfc"如"I like MacDonalds rather than KfC"
-       即匹配到（注意忽略了大小写）
-
-    3. `regex` 为正则，参考  [Python正则表达式](https://docs.python.org/zh-cn/3/library/re.html) ，在消息中有**搜索到该正则即匹配
-       **，示例中的 "参与关键词：「.*?」" 可以匹配消息： "新的抽奖已经创建...
-       参与关键词：「我要抽奖」
-
-       建议先私聊机器人"
-
-    4. 可以只匹配来自特定用户的消息，如群管理员而不是随便什么人发布的抽奖消息
-
-    5. 可以设置默认发布文本， 即只要匹配到消息即默认发送该文本
-
-    6. 提取发布文本的正则，例如 "参与关键词：「(?P<keyword>.*?)」\n" ，注意用括号`(...)` 捕获要提取的文本，
-       可以捕获第3点示例消息的关键词"我要抽奖"并自动发送。若配置了发送文本模板，可用 `{extracted}` 或
-       `{group1}` 引用第一个捕获组，也可用 `{keyword}` 引用命名分组，例如模板 `我要参与 {keyword}` 会发送
-       `我要参与 我要抽奖`。
-
-3. 消息Message结构参考:
-
-```json
-{
-    "_": "Message",
-    "id": 2950,
-    "from_user": {
-        "_": "User",
-        "id": 123456789,
-        "is_self": false,
-        "is_contact": false,
-        "is_mutual_contact": false,
-        "is_deleted": false,
-        "is_bot": false,
-        "is_verified": false,
-        "is_restricted": false,
-        "is_scam": false,
-        "is_fake": false,
-        "is_support": false,
-        "is_premium": false,
-        "is_contact_require_premium": false,
-        "is_close_friend": false,
-        "is_stories_hidden": false,
-        "is_stories_unavailable": true,
-        "is_business_bot": false,
-        "first_name": "linux",
-        "status": "UserStatus.ONLINE",
-        "next_offline_date": "2025-05-30 11:52:40",
-        "username": "linuxdo",
-        "dc_id": 5,
-        "phone_number": "*********",
-        "photo": {
-            "_": "ChatPhoto",
-            "small_file_id": "AQADBQADqqcxG6hqrTMAEAIAA6hqrTMABLkwVDcqzBjAAAQeBA",
-            "small_photo_unique_id": "AgADqqcxG6hqrTM",
-            "big_file_id": "AQADBQADqqcxG6hqrTMAEAMAA6hqrTMABLkwVDcqzBjAAAQeBA",
-            "big_photo_unique_id": "AgADqqcxG6hqrTM",
-            "has_animation": false,
-            "is_personal": false
-        },
-        "added_to_attachment_menu": false,
-        "inline_need_location": false,
-        "can_be_edited": false,
-        "can_be_added_to_attachment_menu": false,
-        "can_join_groups": false,
-        "can_read_all_group_messages": false,
-        "has_main_web_app": false
-    },
-    "date": "2025-05-30 11:47:46",
-    "chat": {
-        "_": "Chat",
-        "id": -52737131599,
-        "type": "ChatType.GROUP",
-        "is_creator": true,
-        "is_deactivated": false,
-        "is_call_active": false,
-        "is_call_not_empty": false,
-        "title": "测试组",
-        "has_protected_content": false,
-        "members_count": 4,
-        "permissions": {
-            "_": "ChatPermissions",
-            "can_send_messages": true,
-            "can_send_media_messages": true,
-            "can_send_other_messages": true,
-            "can_send_polls": true,
-            "can_add_web_page_previews": true,
-            "can_change_info": true,
-            "can_invite_users": true,
-            "can_pin_messages": true,
-            "can_manage_topics": true
-        }
-    },
-    "from_offline": false,
-    "show_caption_above_media": false,
-    "mentioned": false,
-    "scheduled": false,
-    "from_scheduled": false,
-    "edit_hidden": false,
-    "has_protected_content": false,
-    "text": "test, 测试",
-    "video_processing_pending": false,
-    "outgoing": false
-}
-```
-
-#### 示例运行输出：
-
-```
-[INFO] [tg-signer] 2024-10-25 12:29:06,516 core.py 458 开始监控...
-[INFO] [tg-signer] 2024-10-25 12:29:37,034 core.py 439 匹配到监控项：MatchConfig(chat_id=-4573702599, rule=contains, rule_value=kfc), default_send_text=V me 50, send_text_search_regex=None
-[INFO] [tg-signer] 2024-10-25 12:29:37,035 core.py 442 发送文本：V me 50
-[INFO] [tg-signer] 2024-10-25 12:30:02,726 core.py 439 匹配到监控项：MatchConfig(chat_id=-4573702599, rule=regex, rule_value=参与关键词：「.*?」), default_send_text=None, send_text_search_regex=参与关键词：「(?P<keyword>(.*?))」\n
-[INFO] [tg-signer] 2024-10-25 12:30:02,727 core.py 442 发送文本：我要抽奖
-[INFO] [tg-signer] 2024-10-25 12:30:03,001 core.py 226 Message「我要抽奖」 to -4573702599 will be deleted after 5 seconds.
-[INFO] [tg-signer] 2024-10-25 12:30:03,001 core.py 229 Waiting...
-[INFO] [tg-signer] 2024-10-25 12:30:08,260 core.py 232 Message「我要抽奖」 to -4573702599 deleted!
-```
-
-### 版本变动日志
-
-版本变动日志已移至 [CHANGELOG.md](CHANGELOG.md#版本变动日志)。
-
-### 配置与数据存储位置
-
-数据和配置默认保存在 `.signer` 目录中。然后运行 `tree .signer`，你将看到：
-
-```
-.signer
-├── .openai_config.json  # 可选，大模型配置
-├── data.sqlite3  # SQLite 签到记录库
-├── monitors  # 监控
-│   ├── my_monitor  # 监控任务名
-│       └── config.json  # 监控配置
-├── users
-│   └── 123456789
-│       ├── latest_chats.json  # 获取的最近对话
-│       └── me.json  # 个人信息
-├── automations  # 自动化规则
-│   ├── my_auto  # 自动化任务名
-│       ├── config.json  # 自动化配置
-│       └── state.json  # 运行状态
-└── signs  # 签到任务
-    └── linuxdo  # 签到任务名
-        ├── config.json  # 签到配置
-        ├── 123456789
-        │   └── sign_record.json  # 旧版 JSON 签到记录（兼容迁移）
-        └── sign_record.json  # 更旧版 JSON 路径（兼容迁移）
-
-```
-
-迁移到 SQLite 后，新的签到记录只写入 `data.sqlite3`，但仍兼容读取旧
-`sign_record.json`。当运行任务时如果检测到旧 JSON，程序会输出提示并尝试将该任务
-的历史记录自动导入 SQLite。
