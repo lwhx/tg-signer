@@ -1,5 +1,8 @@
 import json
 import os
+import time
+from collections import deque
+from hmac import compare_digest
 from pathlib import Path
 from typing import Callable, Dict
 
@@ -68,6 +71,7 @@ MONITOR_TEMPLATE: Dict[str, object] = {
 
 AUTH_CODE_ENV = "TG_SIGNER_GUI_AUTHCODE"
 AUTH_STORAGE_KEY = "tg_signer_gui_auth_code"
+AUTH_ATTEMPTS: deque[float] = deque(maxlen=100)
 
 
 class UIState:
@@ -678,14 +682,19 @@ def _auth_gate(container, auth_code: str, on_success: Callable[[], None]) -> Non
                 status = ui.label("").classes("text-sm text-negative")
 
                 def verify() -> None:
-                    # TODO: Security improvements needed
-                    # 1. Add rate limiting (e.g. max 5 attempts per minute) to prevent brute-force attacks.
-                    # 2. Use secrets.compare_digest(code, auth_code) to prevent timing attacks.
+                    now = time.monotonic()
+                    while AUTH_ATTEMPTS and now - AUTH_ATTEMPTS[0] >= 60:
+                        AUTH_ATTEMPTS.popleft()
+                    if len(AUTH_ATTEMPTS) >= 5:
+                        status.text = "验证次数过多，请一分钟后重试"
+                        status.update()
+                        return
                     code = (code_input.value or "").strip()
                     if not code:
                         ui.notify("请输入授权码", type="warning")
                         return
-                    if code != auth_code:
+                    if not compare_digest(code, auth_code):
+                        AUTH_ATTEMPTS.append(now)
                         status.text = "授权码错误，请重试"
                         status.update()
                         code_input.set_value("")
@@ -723,6 +732,14 @@ def build_ui(auth_code: str = None) -> None:
 
 
 def main(host: str = None, port: int = None, storage_secret: str = None) -> None:
+    bind_host = host or "127.0.0.1"
+    if bind_host not in {"localhost", "127.0.0.1", "::1"} and not os.environ.get(
+        AUTH_CODE_ENV, ""
+    ).strip():
+        raise ValueError(
+            "公网/局域网监听 WebUI 时必须设置 TG_SIGNER_GUI_AUTHCODE；"
+            "建议配合反向代理和 HTTPS，或仅绑定 127.0.0.1"
+        )
     ui.run(
         build_ui,
         title="TG Signer WebUI",
