@@ -74,3 +74,36 @@ jobs:
           assert svc["environment"]["COOKIE_SECURE"] in ("true", "false")
           print("Dashboard deployment preserves the original /data path")
           PY
+
+  dashboard-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Dashboard Docker image from this branch
+        run: docker build -t ghcr.io/lwhx/tg-signer:latest-dashboard .
+      - name: Boot Dashboard and verify data compatibility paths
+        run: |
+          mkdir -p data
+          docker compose --env-file .env.example up -d --no-build
+          ready=0
+          for attempt in $(seq 1 45); do
+            if curl --fail --silent --max-time 3 \
+              http://127.0.0.1:8999/api/health >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" != "1" ]; then
+            docker compose --env-file .env.example logs --tail=120 dashboard
+            exit 1
+          fi
+          test -f data/dashboard.sqlite3
+          test -f data/encryption.key
+          test -f data/jwt.key
+          test -f data/initial-password.txt
+          docker compose --env-file .env.example ps
+      - name: Tear down test deployment
+        if: always()
+        run: docker compose --env-file .env.example down --remove-orphans
