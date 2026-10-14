@@ -92,6 +92,8 @@ uv.lock
 .ropeproject
 
 # Instance
+# Local container data includes Telegram session credentials, auth state and JSON rules.
+/data/
 media/
 logs/*
 !logs/.gitkeep

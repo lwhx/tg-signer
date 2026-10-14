@@ -61,3 +61,14 @@ jobs:
           python -c "from tg_signer.webui.app import AutomationBlock"
           python -c "from tg_signer.webui.automation_editor import RelayRuleDialog"
           pytest -q tests/test_webui_automation_form.py tests/test_webui_automation_config.py
+
+  compose-config:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Validate root Docker Compose with example configuration
+        run: |
+          docker compose version
+          docker compose --env-file .env.example config --quiet
+          docker compose --env-file .env.example --profile automation config --quiet

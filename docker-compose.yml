@@ -1,0 +1,53 @@
+# Run from the repository root.
+# WebUI: docker compose up -d
+# Optional Automation worker: docker compose --profile automation up -d
+name: tg-signer
+
+x-common: &common
+  init: true
+  restart: unless-stopped
+  volumes:
+    - ./data:/opt/tg-signer
+  environment:
+    TZ: ${TZ:-Asia/Shanghai}
+    TG_PROXY: ${TG_PROXY:-}
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  webui:
+    <<: *common
+    image: ghcr.io/lwhx/tg-signer:latest-webui
+    container_name: tg-signer-webui
+    ports:
+      # Bind to loopback by default; expose only via a secured reverse proxy.
+      - "${WEBUI_BIND_IP:-127.0.0.1}:${WEBUI_PORT:-8080}:8080"
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      TG_PROXY: ${TG_PROXY:-}
+      TG_SIGNER_GUI_AUTHCODE: ${TG_SIGNER_GUI_AUTHCODE:?Set TG_SIGNER_GUI_AUTHCODE in .env}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  automation:
+    <<: *common
+    profiles:
+      - automation
+    image: ghcr.io/lwhx/tg-signer:latest
+    container_name: tg-signer-automation
+    command:
+      - tg-signer
+      - automation
+      - run
+      - "${TG_SIGNER_AUTOMATION_TASK:-example_task}"

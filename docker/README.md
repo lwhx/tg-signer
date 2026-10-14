@@ -1,3 +1,5 @@
+> **新版本推荐：** 请使用仓库根目录的 [docker-compose.yml](../docker-compose.yml) 和 [Docker 部署指南](../docs/docker-deploy.md)。本目录下的 `docker-compose.yml` 是依赖额外 `start.sh` 的旧 CLI 示例，不能直接当作 WebUI 部署配置。
+
 ## 先决条件
 
 工作目录下添加`start.sh`:
@@ -17,9 +19,9 @@ sleep infinity
 发布版本会同步到 GitHub Container Registry：
 
 - `ghcr.io/lwhx/tg-signer:<tag>`
-- `ghcr.io/lwhx/tg-signer:latest`（当推送合法 Docker tag 格式的 Git tag，例如 `v0.0.0`、`0.0.0`、`v0.0.0-beta` 时更新）
+- `ghcr.io/lwhx/tg-signer:latest`（主分支 CI 测试通过后自动更新；推送版本 Tag 也会更新）
 - `ghcr.io/lwhx/tg-signer:<tag>-webui`
-- `ghcr.io/lwhx/tg-signer:latest-webui`（当推送合法 Docker tag 格式的 Git tag，例如 `v0.0.0`、`0.0.0`、`v0.0.0-beta` 时更新）
+- `ghcr.io/lwhx/tg-signer:latest-webui`（主分支 CI 测试通过后自动更新；推送版本 Tag 也会更新）
 
 其中基础镜像默认包含 `speedup` 所需的 `tgcrypto`，`-webui` 变体会额外安装 `gui` 额外依赖（当前包含 `nicegui`）并默认监听 `8080` 端口。
 如果你需要使用国内镜像源或调整构建参数，仍然可以继续按下文方式在本地构建。
@@ -88,11 +90,18 @@ docker run -d --name tg-signer-webui \
       tg-signer:latest bash start.sh
     ```
 
-## 或使用Docker Compose
+## 推荐 Docker Compose
+
+在仓库根目录执行：
 
 ```sh
-docker-compose up -d
+cp .env.example .env
+# 修改 .env 里的 TG_SIGNER_GUI_AUTHCODE 为随机值
+docker compose pull
+docker compose up -d
 ```
+
+完整说明见 [Docker 部署指南](../docs/docker-deploy.md)。本目录旧版 Compose 仍保留供已使用 `start.sh` 的用户参考。
 
 ### 可选：调整时区
 
