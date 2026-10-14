@@ -131,9 +131,31 @@ jobs:
           docker compose --env-file .env.example \
             -f docker-compose.yml -f docker-compose.readonly.yml up -d webui
           test "$(docker inspect -f '{{.HostConfig.ReadonlyRootfs}}' tg-signer-webui)" = true
-          curl --fail --silent --show-error --retry 30 \
-            --retry-connrefused --retry-delay 2 --max-time 4 \
-            http://127.0.0.1:8080/ >/dev/null
+          # An app may reset the connection during the first seconds of boot.
+          # Poll any transient network error, not just connection-refused.
+          ready=0
+          for attempt in $(seq 1 45); do
+            if curl --fail --silent --max-time 3 \
+              http://127.0.0.1:8080/ >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            if [[ "$(docker inspect -f '{{.State.Running}}' tg-signer-webui)" != "true" ]]; then
+              echo "WebUI container stopped before becoming ready"
+              docker compose --env-file .env.example \
+                -f docker-compose.yml -f docker-compose.readonly.yml \
+                logs --tail=120 webui
+              exit 1
+            fi
+            sleep 2
+          done
+          if [[ "${ready}" != "1" ]]; then
+            echo "WebUI did not respond to HTTP within startup window"
+            docker compose --env-file .env.example \
+              -f docker-compose.yml -f docker-compose.readonly.yml \
+              logs --tail=120 webui
+            exit 1
+          fi
           docker compose --env-file .env.example \
             -f docker-compose.yml -f docker-compose.readonly.yml \
             exec -T webui python -c \
