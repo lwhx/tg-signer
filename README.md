@@ -2,19 +2,19 @@
 
 此项目以 [dongbo501/TG-SIGNER](https://github.com/dongbo501/TG-SIGNER) 的 Dashboard 为基础，在保留 [amchii/tg-signer](https://github.com/amchii/tg-signer) BSD-3-Clause 许可证与来源署名的前提下，集成 lwhx 通用消息转发引擎。
 
-> **迁移注意**：沿用原 Dashboard 的 `./data:/data`，保留 `dashboard.sqlite3`、`encryption.key`、`jwt.key`。升级前备份并停止旧容器。此重建分支合并前不能用于生产环境。
+> **迁移注意**：沿用原 Dashboard 的 `./data:/data`，保留 `dashboard.sqlite3`、`encryption.key`、`jwt.key`。升级前备份并停止旧容器。此重建分支未完成验收前不能用于生产环境。迁移见 [Dashboard 数据保留和回滚说明](docs/DASHBOARD-MIGRATION.md)。
 
-# tg-signer Dashboard
+# TG-SIGNER Dashboard（保留原作者界面）
 
 面向 Telegram 签到、自动化与消息监控的单容器 Web 控制台（当前版本：`1.1.0`）。
 
-源码仓库：<https://github.com/dongbo501/TG-SIGNER> · 上游执行器：<https://github.com/amchii/tg-signer>
+当前维护仓库：<https://github.com/lwhx/tg-signer> · Dashboard 来源：<https://github.com/dongbo501/TG-SIGNER> · 上游执行器：<https://github.com/amchii/tg-signer>
 
 基于 [amchii/tg-signer](https://github.com/amchii/tg-signer) 的中文 Web 控制台。前后端、Telegram 协议库和 tg-signer **打包在一个 Docker 镜像、一个运行容器中**。无需另外部署 Node、Nginx、Redis 或数据库容器。
 
 前端采用 Next.js 14 App Router 静态导出、React、Tailwind CSS、Shadcn 风格的 Radix UI 组件、TanStack Table、Lucide、Zustand 和 Recharts；FastAPI 同时提供静态网页、REST API 与 WebSocket；前端支持 EventSource 自动回退。后端采用 SQLAlchemy + SQLite WAL、APScheduler、Kurigram（兼容 Pyrogram）。
 
-上游代码固定于 `fc8905db2ee74e2d9afc135cce88b50be35b6212`，版本 `0.9.1`，保留完整源码和 BSD-3-Clause 许可证。功能依据上游 README、配置模型、签到/监控执行器、automation 引擎及使用文档实现。未修改上游源码。
+Dashboard 源码基于 dongbo501/TG-SIGNER 的现有实现；执行器以 amchii/tg-signer 0.9.1 为基础，整合了 lwhx 通用多目标转发（`relay_message`）、持久化去重和正则测试等改动。因此**本仓库的执行器已经不是原封不动的上游版本**。保留 BSD-3-Clause 许可证和来源说明。
 
 ## 1. 项目目录
 
@@ -115,7 +115,7 @@ Automation 复用上游触发器、过滤器、模板、handler、持久状态�
 
 ## 4. 单容器部署
 
-镜像发布在 `ghcr.io/lwhx/tg-signer:latest-dashboard`（Linux amd64）。在项目目录（或只放一份 `docker-compose.yml` 的目录）中执行：
+镜像计划发布在 `ghcr.io/lwhx/tg-signer:latest-dashboard`（Linux amd64，完成测试并合并后由 Actions 自动构建）。在项目目录（或只放一份 `docker-compose.yml` 的目录）中执行：
 
 ```bash
 docker compose pull
@@ -188,7 +188,7 @@ Swagger：登录后打开 **http://127.0.0.1:8999/api/docs**；OpenAPI JSON：`/
 
 ## 功能与验证边界
 
-网页支持签到/自动化/Monitor、全部五种动作、多账号执行、配置导入导出、Folder 与话题、成员查询、Telegram 定时消息、记录迁移、Python handler 插件、AI 设置和五种失败通知。详细映射见 [docs/FEATURES.md](docs/FEATURES.md)。
+网页支持签到/自动化/Monitor、通用多目标消息转发（forward/copy/text/extract/template）及原有动作、多账号执行、配置导入导出、Folder 与话题、成员查询、Telegram 定时消息、记录迁移、Python handler 插件、AI 设置和五种失败通知。详细映射见 [docs/FEATURES.md](docs/FEATURES.md)；新版消息转发配置见 [迁移文档](docs/DASHBOARD-MIGRATION.md)。
 
 真实 Telegram 登录/发信、AI 识别与外部通知需要您自己的有效账号、网络/API Key 和通知渠道。交付测试使用隔离的临时数据库和模拟 Telegram 返回，**未冒用真实账号、未向外部发送测试消息，未宣称线上签到已验证**。首次实际使用请先添加账号、测试连接，再手动执行一个目标任务检查回复匹配。
 
@@ -220,7 +220,7 @@ npm run test:e2e
 
 ## 镜像构建与发布
 
-镜像地址：`ghcr.io/lwhx/tg-signer:latest-dashboard`（Linux amd64）。部署方式见上文「单容器部署」，
+镜像地址：`ghcr.io/lwhx/tg-signer:latest-dashboard`（Linux amd64，首次通过 CI 发布后可拉取）。部署方式见上文「单容器部署」，
 详细说明见 [release/INSTALL.txt](release/INSTALL.txt)。镜像不包含账号、任务数据或密钥。
 
 从源码重新构建并发布镜像：
