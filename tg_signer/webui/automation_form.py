@@ -31,7 +31,7 @@ def chat_ids_from_text(
         elif item.startswith("@"):
             if not re.fullmatch(r"@[a-zA-Z0-9_]{1,64}", item):
                 raise ValueError(f"无效的用户名: {item}")
-            parsed: int | str = item
+            parsed: int | str = item.lower()
         elif re.fullmatch(r"-?\d{1,20}", item):
             parsed = int(item)
         else:
