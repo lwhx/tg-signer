@@ -5,7 +5,9 @@ from __future__ import annotations
 import hashlib
 import sqlite3
 import time
+from contextlib import closing, contextmanager
 from pathlib import Path
+from typing import Iterator
 
 
 class RelayLedger:
@@ -32,8 +34,12 @@ class RelayLedger:
                 )"""
             )
 
-    def _connect(self) -> sqlite3.Connection:
-        return sqlite3.connect(self.path, timeout=10)
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
+        # Connection context managers commit but do not close; closing does both.
+        with closing(sqlite3.connect(self.path, timeout=10)) as db:
+            with db:
+                yield db
 
     @staticmethod
     def hash_value(text: str) -> str:
