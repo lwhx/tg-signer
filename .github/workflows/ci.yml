@@ -1,0 +1,76 @@
+name: Dashboard CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'refactor/**'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r backend/requirements.txt -e './upstream/tg-signer[yaml]'
+          python -m pip install pytest pytest-asyncio ruff
+      - name: Lint backend
+        run: ruff check backend
+      - name: Dashboard API and data compatibility tests
+        run: python -m pytest -q backend/tests
+      - name: Generic relay engine regression
+        run: python -m pytest -q upstream/tg-signer/tests
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build Next.js dashboard
+        run: npm run build
+
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate production compose
+        run: |
+          docker compose --env-file .env.example config --quiet
+          docker compose --env-file .env.example config --format json > /tmp/compose.json
+          python - <<'PY'
+          import json
+          with open("/tmp/compose.json") as f:
+              config = json.load(f)
+          services = config["services"]
+          assert list(services) == ["dashboard"]
+          svc = services["dashboard"]
+          assert svc["image"] == "ghcr.io/lwhx/tg-signer:latest-dashboard"
+          assert svc["ports"][0]["target"] == 8999
+          assert any(v["target"] == "/data" for v in svc["volumes"])
+          assert svc["read_only"]
+          assert svc["environment"]["COOKIE_SECURE"] in ("true", "false")
+          print("Dashboard deployment preserves the original /data path")
+          PY
