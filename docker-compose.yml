@@ -6,6 +6,17 @@ name: tg-signer
 x-common: &common
   init: true
   restart: unless-stopped
+  # Graceful shutdown allows Telegram session/SQLite writes to finish.
+  stop_grace_period: 40s
+  # Baseline container confinement; no local Docker build required.
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  tmpfs:
+    - /tmp:size=128m,mode=1777
+  # Optional read-only root filesystem lives in docker-compose.readonly.yml.
+  # Keep ./data writable for sessions, automation rules, and delivery records.
   volumes:
     - ./data:/opt/tg-signer
   environment:
