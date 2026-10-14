@@ -195,7 +195,7 @@ export function RelayTargetsEditor({
               <Field label={target.mode === "extract" ? "提取正则（必填）" : "提取正则（可选）"}>
                 <input
                   value={target.pattern || ""}
-                  placeholder="例如：(https?://[^\\s]+)"
+                  placeholder="例如：(https?://[^\s]+)"
                   onChange={(event) => editTarget(index, { pattern: event.target.value })}
                 />
               </Field>
@@ -206,7 +206,7 @@ export function RelayTargetsEditor({
                       value={target.group ?? 1}
                       onChange={(event) => {
                         const value = event.target.value;
-                        editTarget(index, { group: /^\\d+$/.test(value) ? Number(value) : value });
+                        editTarget(index, { group: /^\d+$/.test(value) ? Number(value) : value });
                       }}
                     />
                   </Field>
