@@ -82,7 +82,7 @@ const automationTemplates: any = {
       triggers: [{ type: "message", params: { chat_ids: ["@SourceChannel"] } }],
       filters: {
         text_rule: "regex",
-        text_value: String.raw`\\A20\\d{2}｜长时｜连载｜国漫｜[^\\r\\n]+(?:\\r?\\n[ \\t]*)+https?://115cdn\\.com/s/[^\\s\\r\\n]+[ \\t]*(?:\\r?\\n[ \\t]*)*\\Z`,
+        text_value: String.raw`\A20\d{2}｜长时｜连载｜国漫｜[^\r\n]+(?:\r?\n[ \t]*)+https?://115cdn\.com/s/[^\s\r\n]+[ \t]*(?:\r?\n[ \t]*)*\Z`,
         ignore_case: true,
       },
       handlers: [{
@@ -92,7 +92,7 @@ const automationTemplates: any = {
           targets: [{
             chat_id: "@Your115SaveBot",
             mode: "extract",
-            pattern: String.raw`(https?://115cdn\\.com/s/[^\\s]+)`,
+            pattern: String.raw`(https?://115cdn\.com/s/[^\s]+)`,
             group: 1,
             dedup: "content",
           }],
