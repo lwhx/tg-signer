@@ -58,6 +58,7 @@ WebUI 修改运行中的配置不会实时生效。确认保存后，请使用�
 - `extract`：必须填写捕获正则和存在的捕获组（数字或命名）。
 - `template`：支持 `{text}`、`{chat_id}`、`{message_id}`、`{sender_id}`、`{rule_id}` 等模板变量；可以选填正则。
 - `dedup=message` 会按来源消息及规则区分；`dedup=content` 会按内容去重；`off` 关闭去重。
+- 转发目标也可填写 `me`，将消息发到当前 Telegram 账号的「收藏消息（Saved Messages）」。
 - 禁止来源和目标填写完全相同的 ID/用户名，但无法自动识别「@username 与对应数字 ID 其实属于同一聊天室」的间接循环，请谨慎配置。
 - 纯媒体消息可以通过 forward/copy 转发；text/extract/template 只处理文本或媒体 caption。
 - 仅转发/发送成功不等于外部 Bot 已成功处理相关内容。
