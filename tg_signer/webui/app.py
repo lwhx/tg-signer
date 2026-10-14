@@ -9,6 +9,7 @@ from typing import Callable, Dict
 from nicegui import app, ui
 from pydantic import TypeAdapter
 
+from tg_signer.webui.automation_editor import RelayRuleDialog
 from tg_signer.webui.data import (
     CONFIG_META,
     DEFAULT_LOG_FILE,
@@ -25,7 +26,6 @@ from tg_signer.webui.data import (
     load_user_infos,
     save_config,
 )
-from tg_signer.webui.automation_editor import RelayRuleDialog
 from tg_signer.webui.interactive import InteractiveSignerConfig
 from tg_signer.webui.schema_utils import clean_schema
 

@@ -5,7 +5,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Literal, Optional, Tuple
 
-from tg_signer.config import AutomationConfig, BaseJSONConfig, MonitorConfig, SignConfigV3
+from tg_signer.config import (
+    AutomationConfig,
+    BaseJSONConfig,
+    MonitorConfig,
+    SignConfigV3,
+)
 from tg_signer.sign_record_store import SignRecordStore
 
 ConfigKind = Literal["signer", "monitor", "automation"]
