@@ -5,9 +5,12 @@ on:
     branches:
       - main
       - dev
+      - 'feat/**'
   pull_request:
     branches:
       - main
+      - 'feat/**'
+  workflow_dispatch:
 
 jobs:
   test:
@@ -38,3 +41,23 @@ jobs:
       - name: Run tests
         run: |
           pytest -W=ignore::DeprecationWarning:pyrogram.sync -vv tests/
+
+  webui-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install WebUI dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ".[gui]"
+          pip install --group dev
+      - name: Import WebUI and validate configuration helpers
+        run: |
+          python -c "from tg_signer.webui.app import AutomationBlock"
+          python -c "from tg_signer.webui.automation_editor import RelayRuleDialog"
+          pytest -q tests/test_webui_automation_form.py tests/test_webui_automation_config.py
