@@ -214,3 +214,24 @@ def test_advanced_rule_custom_fields_are_preserved():
     existing = {"rules": [custom]}
     newer = replace_rule(existing, sample_rule(rule_id="other_rule"))
     assert newer["rules"][0] == custom
+
+
+def test_pydantic_normalized_defaults_still_editable():
+    rule = sample_rule()
+    # AutomationConfig.model_dump() serializes all model defaults.
+    rule["triggers"][0]["params"].update(
+        {"reply_to_me": False, "reply_to_message_id": None, "ignore_case": True}
+    )
+    rule["filters"].update(
+        {"chat_id": None, "chat_ids": None, "from_user_ids": None}
+    )
+    rule["vars"] = {}
+    assert editable_rule(rule)
+    form = rule_as_form(rule)
+    assert form["sources"] == "@source_one\n-100123456"
+    advanced = copy.deepcopy(rule)
+    advanced["triggers"][0]["params"]["reply_to_me"] = True
+    assert not editable_rule(advanced)
+    advanced = copy.deepcopy(rule)
+    advanced["filters"]["chat_id"] = "@other_source"
+    assert not editable_rule(advanced)
