@@ -41,6 +41,16 @@ docker compose ps
 
 上述加固不会更改你已发布的 `ghcr.io/lwhx/tg-signer` 镜像，也不在服务器本地重新构建。
 
+**数据目录所有权（重要）：** 当前镜像默认以容器 UID 0 运行，但由于 `cap_drop: ALL`，它不再能越权写入其他 UID 所拥有、权限为 0755 的目录。新部署时应确保宿主机 `./data` 对容器 UID 0 可写。在常规 rootful Docker 的 root 用户部署中，可使用：
+
+```bash
+mkdir -p data
+sudo chown root:root data
+sudo chmod 700 data
+```
+
+上述命令仅为**新建空目录**示例。已有 Telegram Session、`.signer` 或其他数据时，**先备份并检查文件所有者**，不要不加核对地递归修改权限或删除数据。若使用 rootless Docker / userns-remap，容器 UID 0 对应的宿主机 UID 可能不同，须按实际用户映射调整，而不是直接照搬 root:root。若出现 `PermissionError: logs`，优先检查宿主机目录权限及用户映射。
+
 ### 额外开启只读根文件系统
 
 考虑到 NiceGUI、Telegram Session 和 SQLite 的运行时写入需求，默认不强制只读根目录；可以通过 [docker-compose.readonly.yml](../docker-compose.readonly.yml) **显式启用**：
