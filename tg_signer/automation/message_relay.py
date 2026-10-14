@@ -7,6 +7,8 @@ destinations, content extraction, templates, and deduplication policies.
 from __future__ import annotations
 
 import re
+from functools import lru_cache
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from .relay_ledger import RelayLedger
@@ -16,6 +18,11 @@ if TYPE_CHECKING:
 
 _MODES = {"forward", "copy", "text", "extract", "template"}
 _DEDUP = {"message", "content", "off"}
+
+
+@lru_cache(maxsize=16)
+def _get_ledger(workdir: str) -> RelayLedger:
+    return RelayLedger(Path(workdir))
 
 
 def _message_text(message: Any) -> str:
@@ -154,7 +161,7 @@ async def relay_message(
             fingerprint = ""
             if dedup != "off":
                 if ledger is None:
-                    ledger = RelayLedger(ctx.workdir)
+                    ledger = _get_ledger(str(ctx.workdir))
                 fingerprint = _fingerprint(
                     mode, dedup, event, event.message, text, index
                 )
