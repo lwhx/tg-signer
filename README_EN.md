@@ -1,3 +1,7 @@
+# lwhx/tg-signer
+
+Customized distribution based on [amchii/tg-signer](https://github.com/amchii/tg-signer) (BSD-3-Clause preserved). Install this version from the lwhx repository instead of the upstream PyPI distribution.
+
 ## Telegram Daily Auto Check-in / Personal, Group, and Channel Message Monitoring with Auto Reply
 
 [简体中文](./README.md)
@@ -41,8 +45,8 @@ pip install "tg-signer[gui]"
 #### GitHub Container Registry
 
 Two prebuilt images are published on GitHub Container Registry:
-`ghcr.io/amchii/tg-signer:<tag>` (CLI) and
-`ghcr.io/amchii/tg-signer:<tag>-webui` (CLI + WebUI).
+`ghcr.io/lwhx/tg-signer:<tag>` (CLI) and
+`ghcr.io/lwhx/tg-signer:<tag>-webui` (CLI + WebUI).
 
 #### Local
 
