@@ -1,6 +1,13 @@
 name: Publish Docker Image
 
 on:
+  workflow_run:
+    workflows:
+      - Tests
+    types:
+      - completed
+    branches:
+      - main
   push:
     tags:
       - '*'
@@ -21,6 +28,16 @@ env:
 
 jobs:
   publish:
+    # workflow_run executes with package write permission. Only trust green,
+    # direct pushes on the default branch of this repository.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == github.repository
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -39,7 +56,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref || github.ref }}
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.ref || github.ref }}
+
+      - name: Capture checked-out source revision
+        id: source
+        shell: bash
+        run: echo "revision=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -61,9 +83,12 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           PUSH_TAG_NAME: ${{ github.ref_name }}
           MANUAL_IMAGE_TAG: ${{ inputs.image_tag }}
+          SOURCE_SHA: ${{ steps.source.outputs.revision }}
         run: |
           if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
             ref_name="${MANUAL_IMAGE_TAG}"
+          elif [[ "${EVENT_NAME}" == "workflow_run" ]]; then
+            ref_name="main-${SOURCE_SHA:0:12}"
           else
             ref_name="${PUSH_TAG_NAME}"
           fi
@@ -79,7 +104,7 @@ jobs:
             echo "version_tag=${ref_name}${{ matrix.tag_suffix }}"
             echo "tags<<EOF"
             echo "${image}:${ref_name}${{ matrix.tag_suffix }}"
-            if [[ "${EVENT_NAME}" == "push" ]]; then
+            if [[ "${EVENT_NAME}" == "push" || "${EVENT_NAME}" == "workflow_run" ]]; then
               echo "${image}:${{ matrix.latest_tag }}"
             fi
             echo "EOF"
@@ -99,7 +124,7 @@ jobs:
             org.opencontainers.image.title=lwhx-tg-signer
             org.opencontainers.image.description=Automated Telegram tasks with check-ins, monitoring, forwarding, and auto replies.
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.revision=${{ steps.source.outputs.revision }}
             org.opencontainers.image.version=${{ steps.prep.outputs.version_tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
