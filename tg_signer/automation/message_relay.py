@@ -86,10 +86,12 @@ def _content_for_target(
 def _fingerprint(
     mode: str, policy: str, event: Any, message: Any, text: str, index: int
 ) -> str:
-    if policy == "content":
-        identity = f"{mode}:content:{text}"
+    source = f"{event.chat_id}:{getattr(message, 'id', None)}"
+    value = text or _message_text(message)
+    if policy == "content" and value:
+        identity = f"{mode}:content:{value}"
     else:
-        source = f"{event.chat_id}:{getattr(message, 'id', None)}"
+        # Media without text falls back to the source-message identity.
         identity = f"{mode}:message:{source}:{index}"
     return RelayLedger.hash_value(identity)
 
