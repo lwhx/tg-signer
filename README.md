@@ -56,7 +56,7 @@ pip install "lwhx-tg-signer[gui] @ git+https://github.com/lwhx/tg-signer.git"
 #### GitHub Container Registry
 在 GitHub Container Registry 提供了两种预构建镜像：`ghcr.io/lwhx/tg-signer:<tag>`（CLI）和 `ghcr.io/lwhx/tg-signer:<tag>-webui`（CLI + WebUI）。
 
-**推荐 Docker Compose 部署：** 仓库根目录现提供 [docker-compose.yml](./docker-compose.yml) 和 [.env.example](./.env.example)，默认启动 WebUI，可选启用消息监听工作进程，数据统一保存在 `./data`。详细步骤见 [Docker 部署指南](./docs/docker-deploy.md)。
+**推荐 Docker Compose 部署：** 仓库根目录提供 [docker-compose.yml](./docker-compose.yml) 和 [.env.example](./.env.example)，默认启动 WebUI，可选启用消息监听工作进程，数据统一保存在 `./data`。默认启用禁止提权、移除容器 capabilities 和临时目录隔离；额外的 [只读文件系统覆盖配置](./docker-compose.readonly.yml) 可按需启用。详细步骤见 [Docker 部署指南](./docs/docker-deploy.md)。
 
 #### 本地
 如果需要自行构建镜像，本地 build 方式仍然保留，见 [docker](./docker) 目录下的 Dockerfile 和 [README](./docker/README.md) 。

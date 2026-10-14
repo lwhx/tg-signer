@@ -64,11 +64,111 @@ jobs:
 
   compose-config:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Validate root Docker Compose with example configuration
+
+      - name: Validate baseline and optional read-only Compose configurations
         run: |
           docker compose version
           docker compose --env-file .env.example config --quiet
           docker compose --env-file .env.example --profile automation config --quiet
+          docker compose --env-file .env.example \
+            -f docker-compose.yml -f docker-compose.readonly.yml \
+            --profile automation config --quiet
+          docker compose --env-file .env.example \
+            -f docker-compose.yml --profile automation \
+            config --format json > "${RUNNER_TEMP}/tg-baseline.json"
+          docker compose --env-file .env.example \
+            -f docker-compose.yml -f docker-compose.readonly.yml \
+            --profile automation config --format json > "${RUNNER_TEMP}/tg-readonly.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path(os.environ["RUNNER_TEMP"])
+          baseline = json.loads((root / "tg-baseline.json").read_text())
+          hardened = json.loads((root / "tg-readonly.json").read_text())
+          for name in ("webui", "automation"):
+              normal = baseline["services"][name]
+              locked = hardened["services"][name]
+              assert "no-new-privileges:true" in normal["security_opt"]
+              assert "ALL" in normal["cap_drop"]
+              assert any(str(item).startswith("/tmp") for item in normal["tmpfs"])
+              assert normal["stop_grace_period"] is not None
+              assert not normal.get("read_only", False)
+              assert locked["read_only"] is True
+              assert locked["environment"]["PYTHONDONTWRITEBYTECODE"] == "1"
+              assert locked["environment"]["XDG_CACHE_HOME"] == "/tmp/.cache"
+              assert any(
+                  mount["target"] == "/opt/tg-signer" and not mount.get("read_only", False)
+                  for mount in locked["volumes"]
+              )
+          assert baseline["services"]["webui"]["ports"][0]["host_ip"] == "127.0.0.1"
+          assert "TG_SIGNER_GUI_AUTHCODE" in hardened["services"]["webui"]["environment"]
+          print("Docker Compose security assertions passed")
+          PY
+
+      - name: Log into GHCR for same-repo runtime smoke test
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Smoke test published WebUI image with read-only root
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        timeout-minutes: 10
+        run: |
+          mkdir -p data
+          # The image runs as UID 0; cap_drop: ALL removes DAC_OVERRIDE.
+          # A GitHub runner-owned bind mount (UID 1001) is not writable by
+          # container UID 0 without that capability. Simulate root-owned VPS data.
+          sudo chown -R 0:0 data
+          sudo chmod 0700 data
+          docker compose --env-file .env.example \
+            -f docker-compose.yml -f docker-compose.readonly.yml pull webui
+          docker compose --env-file .env.example \
+            -f docker-compose.yml -f docker-compose.readonly.yml up -d webui
+          test "$(docker inspect -f '{{.HostConfig.ReadonlyRootfs}}' tg-signer-webui)" = true
+          # An app may reset the connection during the first seconds of boot.
+          # Poll any transient network error, not just connection-refused.
+          ready=0
+          for attempt in $(seq 1 45); do
+            if curl --fail --silent --max-time 3 \
+              http://127.0.0.1:8080/ >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            if [[ "$(docker inspect -f '{{.State.Running}}' tg-signer-webui)" != "true" ]]; then
+              echo "WebUI container stopped before becoming ready"
+              docker compose --env-file .env.example \
+                -f docker-compose.yml -f docker-compose.readonly.yml \
+                logs --tail=120 webui
+              exit 1
+            fi
+            sleep 2
+          done
+          if [[ "${ready}" != "1" ]]; then
+            echo "WebUI did not respond to HTTP within startup window"
+            docker compose --env-file .env.example \
+              -f docker-compose.yml -f docker-compose.readonly.yml \
+              logs --tail=120 webui
+            exit 1
+          fi
+          docker compose --env-file .env.example \
+            -f docker-compose.yml -f docker-compose.readonly.yml \
+            exec -T webui python -c \
+              "from pathlib import Path; p=Path('/opt/tg-signer/.rw-check'); p.write_text('ok'); p.unlink()"
+
+      - name: Clean up container after smoke test
+        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          docker compose --env-file .env.example \
+            -f docker-compose.yml -f docker-compose.readonly.yml \
+            down --remove-orphans
