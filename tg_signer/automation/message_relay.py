@@ -98,8 +98,8 @@ def _fingerprint(
     if policy == "content" and value:
         identity = f"{mode}:content:{value}"
     else:
-        # Media without text falls back to the source-message identity.
-        identity = f"{mode}:message:{source}:{index}"
+        # Message dedup is per rule; media without text uses message identity.
+        identity = f"{mode}:message:{event.rule_id}:{source}:{index}"
     return RelayLedger.hash_value(identity)
 
 
@@ -129,7 +129,12 @@ async def relay_message(
             ctx.log("relay_message: missing target chat_id", level="WARNING")
             failures = True
             continue
-        if mode not in _MODES or dedup not in _DEDUP:
+        if (
+            not isinstance(mode, str)
+            or not isinstance(dedup, str)
+            or mode not in _MODES
+            or dedup not in _DEDUP
+        ):
             ctx.log("relay_message: unknown mode or dedup policy", level="WARNING")
             failures = True
             continue
